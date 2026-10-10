@@ -50,6 +50,8 @@ export interface V2rayManagerOptions {
   vaultPath: string
   logger?: Logger
   fetchImpl?: typeof fetch
+  /** Overridable so tests do not have to wait out the real ceiling. */
+  nodeTestTimeoutMs?: number
 }
 
 /**
@@ -64,6 +66,7 @@ export class V2rayManager {
   private readonly vaultPath: string
   private readonly logger?: Logger
   private readonly fetchImpl: typeof fetch
+  private readonly nodeTestTimeoutMs: number
   private readonly running = new Map<string, RunningRelay>()
   private readonly starting = new Map<string, Promise<RunningRelay>>()
   private readonly startingNode = new Map<string, string>()
@@ -74,6 +77,7 @@ export class V2rayManager {
     this.vaultPath = options.vaultPath
     this.logger = options.logger
     this.fetchImpl = options.fetchImpl ?? fetch
+    this.nodeTestTimeoutMs = options.nodeTestTimeoutMs ?? NODE_TEST_TIMEOUT_MS
   }
 
   async initialize(): Promise<void> {
@@ -227,74 +231,109 @@ export class V2rayManager {
     await this.store.removeSubscription(id)
   }
 
+  /** One measurement: start a throwaway relay, then time a round trip through it. */
+  private async probeNode(
+    nodeId: string,
+    probeId: string,
+    deadline: number,
+    startedAt: number
+  ): Promise<V2rayNodeTestResult> {
+    const started = this.ensureRunning(probeId, nodeId, remainingMs(deadline))
+    try {
+      const endpoint = await started
+      const budget = remainingMs(deadline)
+      if (budget <= 0) throw new Error('节点测速超时')
+      const { ProxyAgent, request } = await import('undici')
+      const dispatcher = new ProxyAgent(`socks5://${endpoint.host}:${endpoint.port}`)
+      try {
+        const response = await request('https://ipwho.is/', {
+          dispatcher,
+          method: 'GET',
+          headers: { accept: 'application/json', 'user-agent': 'Prism-Browser/0.1' },
+          headersTimeout: budget,
+          bodyTimeout: budget,
+          signal: AbortSignal.timeout(budget)
+        })
+        if (response.statusCode !== 200) {
+          await response.body.dump()
+          throw new Error(`检测服务返回 HTTP ${response.statusCode}`)
+        }
+        const data = await response.body.json() as {
+          success?: boolean
+          ip?: string
+          country?: string
+          country_code?: string
+          timezone?: { id?: string }
+        }
+        if (data.success === false || !data.ip) throw new Error('节点出口检测失败')
+        return {
+          ok: true,
+          latencyMs: Date.now() - startedAt,
+          testedAt: new Date().toISOString(),
+          ip: data.ip,
+          country: data.country,
+          countryCode: data.country_code?.toUpperCase(),
+          timezone: data.timezone?.id
+        }
+      } finally {
+        await dispatcher.close().catch(() => undefined)
+      }
+    } finally {
+      // Runs whether the probe finished or lost the race below. The relay must
+      // go even when the start never resolved, so the pending start is awaited.
+      void started.catch(() => undefined).then(() => this.stop(probeId)).catch(() => undefined)
+    }
+  }
+
   /**
    * Starts a throwaway relay for one node, measures the round trip to the
    * GeoIP endpoint through it, and records the result on the node.
    *
-   * The whole probe — starting Xray included — is capped by NODE_TEST_TIMEOUT_MS,
-   * so a dead node cannot hold the UI for longer than that.
+   * The measurement is raced against a hard timer rather than only having its
+   * budget handed down to each step: neither undici's SOCKS5 handshake nor a
+   * relay teardown honours that budget, so a dead node could otherwise hold the
+   * caller well past the ceiling. Teardown happens off the return path.
    */
   async testNode(nodeId: string): Promise<V2rayNodeTestResult> {
     const node = this.store.node(nodeId)
     if (!node) throw new Error('v2ray 节点不存在')
     const startedAt = Date.now()
-    const deadline = startedAt + NODE_TEST_TIMEOUT_MS
+    const timeoutMs = this.nodeTestTimeoutMs
+    const deadline = startedAt + timeoutMs
     const probeId = `probe-${randomUUID()}`
-    const result = await (async (): Promise<V2rayNodeTestResult> => {
-      try {
-        const endpoint = await this.ensureRunning(probeId, nodeId, remainingMs(deadline))
-        const budget = remainingMs(deadline)
-        if (budget <= 0) throw new Error('节点测速超时')
-        const { ProxyAgent, request } = await import('undici')
-        const dispatcher = new ProxyAgent(`socks5://${endpoint.host}:${endpoint.port}`)
-        try {
-          const response = await request('https://ipwho.is/', {
-            dispatcher,
-            method: 'GET',
-            headers: { accept: 'application/json', 'user-agent': 'Prism-Browser/0.1' },
-            headersTimeout: budget,
-            bodyTimeout: budget,
-            signal: AbortSignal.timeout(budget)
-          })
-          if (response.statusCode !== 200) {
-            await response.body.dump()
-            throw new Error(`检测服务返回 HTTP ${response.statusCode}`)
-          }
-          const data = await response.body.json() as {
-            success?: boolean
-            ip?: string
-            country?: string
-            country_code?: string
-            timezone?: { id?: string }
-          }
-          if (data.success === false || !data.ip) throw new Error('节点出口检测失败')
-          return {
-            ok: true,
-            latencyMs: Date.now() - startedAt,
-            testedAt: new Date().toISOString(),
-            ip: data.ip,
-            country: data.country,
-            countryCode: data.country_code?.toUpperCase(),
-            timezone: data.timezone?.id
-          }
-        } finally {
-          await dispatcher.close().catch(() => undefined)
-        }
-      } catch (error) {
+
+    const probe = this.probeNode(nodeId, probeId, deadline, startedAt)
+      .catch((error): V2rayNodeTestResult => {
         const failureKind = classifyProxyFailure(error)
         return {
           ok: false,
           latencyMs: Date.now() - startedAt,
           testedAt: new Date().toISOString(),
           error: failureKind === 'timeout' && Date.now() >= deadline
-            ? `测速超过 ${NODE_TEST_TIMEOUT_MS / 1000} 秒`
+            ? `测速超过 ${timeoutMs / 1000} 秒`
             : safeErrorText(error),
           failureKind
         }
-      } finally {
-        await this.stop(probeId)
-      }
-    })()
+      })
+
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const expired = new Promise<V2rayNodeTestResult>((resolve) => {
+      timer = setTimeout(() => resolve({
+        ok: false,
+        latencyMs: timeoutMs,
+        testedAt: new Date().toISOString(),
+        error: `测速超过 ${timeoutMs / 1000} 秒`,
+        failureKind: 'timeout'
+      }), timeoutMs)
+    })
+
+    let result: V2rayNodeTestResult
+    try {
+      result = await Promise.race([probe, expired])
+    } finally {
+      clearTimeout(timer)
+    }
+
     // A vanished node must not turn a measurement into a hard failure.
     await this.store.recordNodeTest(nodeId, result).catch(() => undefined)
     return result

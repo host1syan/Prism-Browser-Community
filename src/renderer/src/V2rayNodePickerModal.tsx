@@ -2,7 +2,7 @@ import { t } from '../../shared/i18n'
 import { Alert, Button, Modal, Select, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BrowserProfileView, V2rayNodeTestResult, V2rayNodeView } from '../../shared/types'
-import { nodeLabel, nodeTestText, sortNodesBySpeed } from './v2ray-node'
+import { nodeLabel, nodeTestText, probePool, sortNodesBySpeed } from './v2ray-node'
 
 interface V2rayNodePickerModalProps {
   /** The profile whose node is being changed; null closes the modal. */
@@ -89,22 +89,13 @@ export function V2rayNodePickerModal({ profile, onClose, onSelect }: V2rayNodePi
     setTestingAll(true)
     setProbes({})
     setProgress({ done: 0, total: nodes.length })
-    let done = 0
-    for (let index = 0; index < nodes.length; index += PROBE_CONCURRENCY) {
-      if (cancelledRef.current) break
-      await Promise.allSettled(nodes.slice(index, index + PROBE_CONCURRENCY).map((node) => probeOne(node.id)))
-      done = Math.min(index + PROBE_CONCURRENCY, nodes.length)
-      setProgress({ done, total: nodes.length })
-    }
-    setTestingAll(false)
-    if (cancelledRef.current) return
-    // Reflect the persisted measurements so the table sorts fastest-first.
-    const refreshed = await window.browserApi.v2ray.nodes().catch(() => null)
-    if (cancelledRef.current) return
-    if (refreshed && profileIdRef.current === profile?.id) {
-      setNodes(refreshed)
-      setProbes({})
-      resultsRef.current = {}
+    try {
+      await probePool(nodes.map((node) => node.id), PROBE_CONCURRENCY, probeOne, {
+        isCancelled: () => cancelledRef.current,
+        onProgress: (done, total) => setProgress({ done, total })
+      })
+    } finally {
+      setTestingAll(false)
     }
   }
 

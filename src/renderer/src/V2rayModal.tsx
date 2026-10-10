@@ -3,7 +3,7 @@ import { DeleteOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design
 import { Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { V2rayCoreStatus, V2rayNodeTestResult, V2rayNodeView, V2raySubscription, V2raySubscriptionDraft } from '../../shared/types'
-import { sortNodesBySpeed } from './v2ray-node'
+import { probePool, sortNodesBySpeed } from './v2ray-node'
 
 interface V2rayModalProps {
   open: boolean
@@ -28,7 +28,6 @@ export function V2rayModal({ open, onClose }: V2rayModalProps) {
   const [busy, setBusy] = useState(false)
   const [coreBusy, setCoreBusy] = useState(false)
   const [testingAllSubscriptionId, setTestingAllSubscriptionId] = useState<string | null>(null)
-  const [sortedBySpeed, setSortedBySpeed] = useState(false)
   const [testResults, setTestResults] = useState<Record<string, V2rayNodeTestResult>>({})
   const [probes, setProbes] = useState<Record<string, 'running' | 'ok' | 'failed'>>({})
   const [testProgress, setTestProgress] = useState({ done: 0, total: 0 })
@@ -52,7 +51,7 @@ export function V2rayModal({ open, onClose }: V2rayModalProps) {
     if (!open) return
     form.setFieldsValue({ name: '', source: 'url', content: '' })
     setTestResults({})
-    setSortedBySpeed(false)
+    lastTestedSubscriptionRef.current = null
     setTestingAllSubscriptionId(null)
     setProbes({})
     setTestProgress({ done: 0, total: 0 })
@@ -76,13 +75,13 @@ export function V2rayModal({ open, onClose }: V2rayModalProps) {
    */
   const displayNodes = useMemo(() => {
     const subscriptionId = lastTestedSubscriptionRef.current
-    if (!sortedBySpeed || !subscriptionId) return nodes
+    if (!subscriptionId) return nodes
     const measured = nodes
       .filter((node) => node.subscriptionId === subscriptionId)
       .map((node) => ({ ...node, test: resultFor(node) }))
     const rest = nodes.filter((node) => node.subscriptionId !== subscriptionId)
     return [...sortNodesBySpeed(measured), ...rest]
-  }, [nodes, sortedBySpeed, testResults, probes])
+  }, [nodes, testResults, probes])
 
   async function run(action: () => Promise<unknown>, successText: string): Promise<void> {
     setBusy(true)
@@ -131,13 +130,16 @@ export function V2rayModal({ open, onClose }: V2rayModalProps) {
   }
 
   /**
-   * Probes every node of one subscription, four at a time.
+   * Probes every node of one subscription with a fixed number of workers.
    *
    * The loop lives here rather than behind a single IPC call so each row can
    * show its own state as soon as it finishes — a large subscription would
    * otherwise sit behind a spinner for minutes with no feedback. Results are
    * merged per node, never cleared wholesale, so a manual probe the user just
    * ran on another subscription stays visible.
+   *
+   * Ranking is live: `displayNodes` re-sorts on every result, so the fastest
+   * node is already on top while the batch is still running.
    */
   async function testAllNodes(subscriptionId: string): Promise<void> {
     const ids = nodes.filter((node) => node.subscriptionId === subscriptionId).map((node) => node.id)
@@ -147,21 +149,15 @@ export function V2rayModal({ open, onClose }: V2rayModalProps) {
     setTestingAllSubscriptionId(subscriptionId)
     setTestProgress({ done: 0, total: ids.length })
     try {
-      for (let index = 0; index < ids.length; index += PROBE_CONCURRENCY) {
-        if (cancelledRef.current) break
-        await Promise.allSettled(ids.slice(index, index + PROBE_CONCURRENCY).map((id) => testNode(id)))
-        setTestProgress({ done: Math.min(index + PROBE_CONCURRENCY, ids.length), total: ids.length })
-      }
+      const probed = await probePool(ids, PROBE_CONCURRENCY, testNode, {
+        isCancelled: () => cancelledRef.current,
+        onProgress: (done, total) => setTestProgress({ done, total })
+      })
       if (cancelledRef.current) {
         message.info(t('已停止测速'))
         return
       }
-      // Re-read the store so every row carries its persisted measurement, then
-      // show the probed subscription fastest-first.
-      const refreshed = await window.browserApi.v2ray.nodes()
-      setNodes(refreshed)
-      setTestResults({})
-      setSortedBySpeed(true)
+      if (!probed) return
       message.success(t('测速完成，已按速度排序'))
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error))

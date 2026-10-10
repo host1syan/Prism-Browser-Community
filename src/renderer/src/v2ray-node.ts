@@ -32,3 +32,47 @@ export function nodeTestText(test: V2rayNodeTestResult | undefined): string | un
 export function nodeLabel(node: V2rayNodeView): string {
   return `${node.name} · ${node.protocol.toUpperCase()} · ${node.address}:${node.port}`
 }
+
+export interface ProbePoolOptions {
+  /** Polled before each item is handed out; true stops the pool taking more. */
+  isCancelled: () => boolean
+  onProgress?: (done: number, total: number) => void
+}
+
+/**
+ * Runs `probe` over every item with a fixed number of workers.
+ *
+ * A worker takes the next item the moment it finishes its own, so one slow item
+ * never parks the others. Chunking with `Promise.allSettled` looks equivalent
+ * but is not: a single item that takes the full timeout holds up every worker
+ * in its chunk, and the ones already finished sit idle instead of moving on.
+ *
+ * `cursor` is read and advanced without an intervening await, so no two workers
+ * can claim the same item.
+ */
+export async function probePool<T>(
+  items: T[],
+  concurrency: number,
+  probe: (item: T) => Promise<void>,
+  options: ProbePoolOptions
+): Promise<number> {
+  const total = items.length
+  let cursor = 0
+  let done = 0
+  const workers = Math.max(1, Math.min(concurrency, total))
+  await Promise.all(Array.from({ length: workers }, async () => {
+    while (!options.isCancelled()) {
+      const index = cursor
+      cursor += 1
+      if (index >= total) return
+      try {
+        await probe(items[index])
+      } catch {
+        // A probe reports its own failure on its row; it must not kill the pool.
+      }
+      done += 1
+      options.onProgress?.(done, total)
+    }
+  }))
+  return done
+}
