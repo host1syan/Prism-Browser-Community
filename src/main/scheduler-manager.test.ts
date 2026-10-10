@@ -30,10 +30,9 @@ async function fixture(now: Date) {
   const audit = new SchedulerAuditLog(root); await audit.initialize()
   const launcher = { launch: vi.fn(async () => ({ status: 'running' })), close: vi.fn(async () => ({ status: 'closed' })) }
   const profiles = { get: vi.fn((id: string) => ({ id })) }
-  const licensing = { has: vi.fn(() => true) }
-  const manager = new SchedulerManager(store, profiles as never, launcher as never, licensing, audit, () => undefined, undefined, () => new Date(clock), 60 * 60_000)
+  const manager = new SchedulerManager(store, profiles as never, launcher as never, audit, () => undefined, undefined, () => new Date(clock), 60 * 60_000)
   await manager.initialize()
-  return { store, audit, launcher, profiles, licensing, manager, setNow: (value: Date) => { clock = new Date(value) } }
+  return { store, audit, launcher, profiles, manager, setNow: (value: Date) => { clock = new Date(value) } }
 }
 
 describe('SchedulerManager', () => {
@@ -69,15 +68,12 @@ describe('SchedulerManager', () => {
     await item.manager.shutdown()
   })
 
-  it('keeps tasks but blocks mutations when the scheduler entitlement is absent', async () => {
+  it('creates, toggles and removes tasks without any entitlement gate', async () => {
     const start = new Date('2026-08-10T00:00:00.000Z')
     const item = await fixture(start)
     const existing = await item.manager.create(once(new Date(start.getTime() + 60_000)))
-    item.licensing.has.mockReturnValue(false)
-    item.manager.refreshEntitlement()
-    await expect(item.manager.create(once(new Date(start.getTime() + 60_000)))).rejects.toThrow('需要 Prism Pro')
     await expect(item.manager.setEnabled(existing.id, false)).resolves.toMatchObject({ enabled: false })
-    await expect(item.manager.setEnabled(existing.id, true)).rejects.toThrow('需要 Prism Pro')
+    await expect(item.manager.setEnabled(existing.id, true)).resolves.toMatchObject({ enabled: true })
     await expect(item.manager.remove(existing.id)).resolves.toBeUndefined()
     expect(item.store.list()).toEqual([])
     await item.manager.shutdown()

@@ -31,12 +31,27 @@ import {
   refreshSeededGpuIdentity
 } from '../../shared/hardware-profiles'
 import { effectiveNetworkIdentity } from '../../shared/network-identity'
-import type { BrowserExtension, BrowserProfileView, EngineStatus, HardwareProfileId, KernelRelease, ProfileDraft, ProxyTestResult } from '../../shared/types'
-import { kernelRequiresPro } from '../../shared/kernel-policy'
+import type { BrowserExtension, BrowserProfileView, EngineStatus, HardwareProfileId, KernelRelease, ProfileDraft, ProxyTestResult, V2rayNodeTestResult, V2rayNodeView } from '../../shared/types'
+import { nodeLabel } from './v2ray-node'
 
 interface EditorValues extends Omit<ProfileDraft, 'startUrls' | 'color'> {
   startUrlsText: string
   color: string | { toHexString: () => string }
+}
+
+/**
+ * The freshest measurement for a node: the result of the in-editor probe wins,
+ * otherwise the one persisted from the subscription manager. The in-editor
+ * result is only attributed to the node it was actually measured against.
+ */
+function v2rayTestResult(
+  node: V2rayNodeView | undefined,
+  live: V2rayNodeTestResult | null,
+  liveNodeId: string | undefined
+): V2rayNodeTestResult | undefined {
+  if (!node) return undefined
+  if (live && node.id === liveNodeId) return live
+  return node.test
 }
 
 interface ProfileEditorProps {
@@ -48,9 +63,10 @@ interface ProfileEditorProps {
   engine: EngineStatus | null
   kernels: KernelRelease[]
   groups: string[]
-  proEnabled: boolean
   onCancel: () => void
   onSave: (draft: ProfileDraft) => Promise<void>
+  /** Opens the subscription manager; the editor stays open behind it. */
+  onManageV2ray: () => void
 }
 
 function editorValues(profile: BrowserProfileView | undefined, index: number): EditorValues {
@@ -75,7 +91,7 @@ function editorValues(profile: BrowserProfileView | undefined, index: number): E
 }
 
 
-export function ProfileEditor({ open, profile, suggestedIndex, saving, extensions, engine, kernels, groups, proEnabled, onCancel, onSave }: ProfileEditorProps) {
+export function ProfileEditor({ open, profile, suggestedIndex, saving, extensions, engine, kernels, groups, onCancel, onSave, onManageV2ray }: ProfileEditorProps) {
   const riskLabels: Record<NonNullable<ProxyTestResult['networkRisk']>, string> = {
     tor: t("Tor 出口"),
     vpn: t("VPN 网络"),
@@ -87,6 +103,7 @@ export function ProfileEditor({ open, profile, suggestedIndex, saving, extension
   const proxyProtocol = Form.useWatch(['proxy', 'protocol'], form)
   const proxyPassword = Form.useWatch(['proxy', 'password'], form) ?? ''
   const proxyPasswordStored = Form.useWatch(['proxy', 'passwordStored'], form) === true
+  const selectedV2rayNodeId = Form.useWatch(['proxy', 'v2rayNodeId'], form) as string | undefined
   const webrtcPolicy = Form.useWatch(['fingerprint', 'webrtcPolicy'], form) ?? 'proxy_only'
   const fingerprintTimezone = Form.useWatch(['fingerprint', 'timezone'], form)
   const fingerprintLanguage = Form.useWatch(['fingerprint', 'language'], form) ?? 'zh-CN'
@@ -100,6 +117,10 @@ export function ProfileEditor({ open, profile, suggestedIndex, saving, extension
   const windowMode = Form.useWatch(['window', 'mode'], form) ?? 'auto'
   const [testingProxy, setTestingProxy] = useState(false)
   const [proxyResult, setProxyResult] = useState<ProxyTestResult | null>(null)
+  const [v2rayNodes, setV2rayNodes] = useState<V2rayNodeView[]>([])
+  const [loadingV2rayNodes, setLoadingV2rayNodes] = useState(false)
+  const [v2rayTest, setV2rayTest] = useState<V2rayNodeTestResult | null>(null)
+  const selectedV2rayNode = v2rayNodes.find((node) => node.id === selectedV2rayNodeId)
   const pinnedKernel = kernels.find((kernel) => kernel.version === kernelVersion)
   const selectedEngine: EngineStatus | null = kernelVersion
     ? {
@@ -131,18 +152,48 @@ export function ProfileEditor({ open, profile, suggestedIndex, saving, extension
     if (open) {
       form.setFieldsValue(editorValues(profile, suggestedIndex))
       setProxyResult(null)
+      setV2rayTest(null)
     }
   }, [form, open, profile, suggestedIndex])
 
+  async function reloadV2rayNodes(): Promise<void> {
+    setLoadingV2rayNodes(true)
+    try {
+      setV2rayNodes(await window.browserApi.v2ray.nodes())
+    } catch {
+      setV2rayNodes([])
+    } finally {
+      setLoadingV2rayNodes(false)
+    }
+  }
+
+  useEffect(() => {
+    if (open && proxyProtocol === 'v2ray') void reloadV2rayNodes()
+  }, [open, proxyProtocol])
+
   async function testCurrentProxy(): Promise<void> {
     try {
+      if (proxyProtocol === 'v2ray') {
+        if (!selectedV2rayNodeId) return
+        setTestingProxy(true)
+        setV2rayTest(null)
+        setV2rayTest(await window.browserApi.v2ray.testNode(selectedV2rayNodeId))
+        return
+      }
       if (proxyProtocol !== 'direct') await form.validateFields([['proxy', 'host'], ['proxy', 'port']])
       setTestingProxy(true)
       setProxyResult(null)
       setProxyResult(await window.browserApi.proxy.test(form.getFieldValue('proxy'), profile?.id))
     } catch (error) {
       if (!(error && typeof error === 'object' && 'errorFields' in error)) {
-        setProxyResult({ ok: false, latencyMs: 0, error: error instanceof Error ? error.message : String(error) })
+        const result = {
+          ok: false,
+          latencyMs: 0,
+          testedAt: new Date().toISOString(),
+          error: error instanceof Error ? error.message : String(error)
+        }
+        if (proxyProtocol === 'v2ray') setV2rayTest(result)
+        else setProxyResult(result)
       }
     } finally {
       setTestingProxy(false)
@@ -186,8 +237,7 @@ export function ProfileEditor({ open, profile, suggestedIndex, saving, extension
             { value: '', label: t("自动跟随当前内核{0}", engine?.version ? ` · ${engine.version}` : '') },
             ...kernels.map((kernel) => ({
               value: kernel.version,
-              label: `${kernel.version}${kernelRequiresPro(kernel.version) ? ' · Pro' : ''}${kernel.origin === 'local-build' ? ' · ' + t('本地构建') : ''}`,
-              disabled: kernelRequiresPro(kernel.version) && !proEnabled
+              label: `${kernel.version}${kernel.origin === 'local-build' ? ' · ' + t('本地构建') : ''}`
             })),
             ...(kernelVersion && !pinnedKernel ? [{ value: kernelVersion, label: t("{0} · 当前未安装", kernelVersion) }] : [])
           ]}
@@ -271,11 +321,68 @@ export function ProfileEditor({ open, profile, suggestedIndex, saving, extension
             { value: 'direct', label: t("不使用代理（本地网络）") },
             { value: 'http', label: 'HTTP' },
             { value: 'https', label: 'HTTPS' },
-            { value: 'socks5', label: 'SOCKS5' }
+            { value: 'socks5', label: 'SOCKS5' },
+            { value: 'v2ray', label: t("V2Ray 订阅节点") }
           ]}
         />
       </Form.Item>
-      {proxyProtocol !== 'direct' && (
+      {proxyProtocol === 'v2ray' && (
+        <>
+          <Form.Item
+            name={['proxy', 'v2rayNodeId']}
+            label={t("节点")}
+            rules={[{ required: true, message: t("请选择 v2ray 节点") }]}
+            extra={t("节点在「V2Ray 订阅」中管理。每个环境独立连接，出口 IP 互不影响。")}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              loading={loadingV2rayNodes}
+              placeholder={v2rayNodes.length ? t("选择节点") : t("尚未添加订阅")}
+              options={v2rayNodes.map((node) => ({
+                value: node.id,
+                label: nodeLabel(node)
+              }))}
+              optionRender={(option) => {
+                const node = v2rayNodes.find((item) => item.id === option.value)
+                const result = v2rayTestResult(node, v2rayTest, selectedV2rayNodeId)
+                return (
+                  <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                    <span>{option.label}</span>
+                    {result && (
+                      <Typography.Text type="success">
+                        {result.ok
+                          ? `${result.latencyMs} ms${result.country ? ` · ${result.country}` : ''}`
+                          : t("测速失败")}
+                      </Typography.Text>
+                    )}
+                  </Space>
+                )
+              }}
+              notFoundContent={<Button type="link" onClick={onManageV2ray}>{t("添加订阅")}</Button>}
+            />
+          </Form.Item>
+          <Space>
+            <Button onClick={onManageV2ray}>{t("管理订阅")}</Button>
+            <Button onClick={() => void reloadV2rayNodes()}>{t("刷新节点列表")}</Button>
+          </Space>
+          {selectedV2rayNode && (() => {
+            const result = v2rayTestResult(selectedV2rayNode, v2rayTest, selectedV2rayNodeId)
+            if (!result) return null
+            return (
+              <Typography.Text type={result.ok ? 'success' : 'danger'}>
+                {result.ok
+                  ? t("测速：{0} ms", result.latencyMs) + (result.country ? ` · ${result.country}` : '')
+                  : t("测速失败：{0}", result.error)}
+              </Typography.Text>
+            )
+          })()}
+          {selectedV2rayNode?.parseWarning && (
+            <Alert type="warning" showIcon message={mt(selectedV2rayNode.parseWarning)} />
+          )}
+        </>
+      )}
+      {proxyProtocol !== 'direct' && proxyProtocol !== 'v2ray' && (
         <>
           <Row gutter={12}>
             <Col span={16}>
@@ -318,10 +425,30 @@ export function ProfileEditor({ open, profile, suggestedIndex, saving, extension
           </Row>
         </>
       )}
-      <Space className="proxy-test-row">
-        <Button loading={testingProxy} onClick={() => void testCurrentProxy()}>{t("检测连接")}</Button>
-        {proxyResult && !proxyResult.ok && <Typography.Text type="danger">{t("连接失败：{0}", proxyResult.error)}</Typography.Text>}
-      </Space>
+      {proxyProtocol !== 'v2ray' && (
+        <Space className="proxy-test-row">
+          <Button loading={testingProxy} onClick={() => void testCurrentProxy()}>{t("检测连接")}</Button>
+          {proxyResult && !proxyResult.ok && <Typography.Text type="danger">{t("连接失败：{0}", proxyResult.error)}</Typography.Text>}
+        </Space>
+      )}
+      {proxyProtocol === 'v2ray' && (
+        <Space className="proxy-test-row">
+          <Button
+            loading={testingProxy}
+            disabled={!selectedV2rayNodeId}
+            onClick={() => void testCurrentProxy()}
+          >
+            {t("检测节点")}
+          </Button>
+          {v2rayTest && !v2rayTest.ok && <Typography.Text type="danger">{t("连接失败：{0}", v2rayTest.error)}</Typography.Text>}
+          {v2rayTest?.ok && (
+            <Typography.Text type="success">
+              {t("出口 IP：{0}", v2rayTest.ip)} · {v2rayTest.latencyMs} ms
+              {v2rayTest.country ? ` · ${v2rayTest.country}` : ''}
+            </Typography.Text>
+          )}
+        </Space>
+      )}
       {proxyResult?.ok && (
         <div className="proxy-test-result">
           <div className="proxy-result-line">

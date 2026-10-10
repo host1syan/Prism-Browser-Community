@@ -38,7 +38,7 @@ Interface preferences are separate from browser profiles: names, notes, groups, 
 - Resolve labels during rendering and include the active locale in memo dependencies. Avoid language-dependent React keys that would remount forms.
 - Native dialogs and generated copy/import name suffixes share the main-process locale. Use `suffixedProfileName` to respect the existing name-length limit.
 
-编辑 `src/shared/locales/` 中对应语言的 JSON，保持 13 份词库键名一致，保留占位符。用户内容通过参数插入，禁止作为词条翻译；状态翻译只处理应用自身文案。切换语言应触发重新渲染，不应重新挂载表单。新增翻译不得携带私有 Pro 运行时、授权服务、密钥或私有发布配置。公开版原有 Pro 入口的文案翻译不改变授权与功能边界。
+编辑 `src/shared/locales/` 中对应语言的 JSON，保持 13 份词库键名一致，保留占位符。用户内容通过参数插入，禁止作为词条翻译；状态翻译只处理应用自身文案。切换语言应触发重新渲染，不应重新挂载表单。新增翻译不得携带密钥或私有发布配置。
 
 ## Verification / 验证
 
@@ -55,6 +55,6 @@ The unit suite checks OS-language resolution, saved preferences, English fallbac
 
 单元测试覆盖系统语言匹配、保存偏好、英语兜底、词库与占位符、生成名称长度。桌面冒烟测试需要图形桌面和项目 Electron；它使用独立临时数据目录，逐一验证 13 种语言、环境与草稿保留、重启后偏好保留。报告及截图保存在系统临时目录的 `prism-community-i18n-results` 中，也可用 `--output <目录>` 指定位置。
 
-This test does not require a private Pro runtime or start a browser kernel. Desktop UI verification for this port was performed on macOS; Windows-specific startup behavior is covered by mocked Electron unit tests, not a Windows device run.
+This test does not require a private runtime or start a browser kernel. Desktop UI verification for this port was performed on macOS; Windows-specific startup behavior is covered by mocked Electron unit tests, not a Windows device run.
 
-该测试无需 Pro 私有运行时，也不启动浏览器内核。本次移植的桌面界面验证在 macOS 完成；Windows 相关启动逻辑由模拟 Electron 的单元测试覆盖，未进行 Windows 真机验证。
+该测试无需私有运行时，也不启动浏览器内核。本次移植的桌面界面验证在 macOS 完成；Windows 相关启动逻辑由模拟 Electron 的单元测试覆盖，未进行 Windows 真机验证。

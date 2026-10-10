@@ -120,6 +120,39 @@ describe('ProfileStore', () => {
     expect(repository.get(second.id).tags).toEqual(['已有', '批量标签'])
   })
 
+  it('repoints a v2ray profile at another node and drops the stale exit check', async () => {
+    const repository = await store()
+    const draft = defaultProfileDraft()
+    const profile = await repository.create({
+      ...draft,
+      proxy: { protocol: 'v2ray', host: '', username: '', password: '', v2rayNodeId: '11111111-1111-1111-1111-111111111111' }
+    })
+    await repository.setProxyCheck(profile.id, { ok: true, ip: '203.0.113.8', latencyMs: 30, checkedAt: new Date().toISOString() })
+
+    const switched = await repository.setV2rayNode(profile.id, '22222222-2222-2222-2222-222222222222')
+
+    expect(switched.proxy.v2rayNodeId).toBe('22222222-2222-2222-2222-222222222222')
+    expect(switched.proxy.protocol).toBe('v2ray')
+    expect(switched.proxyCheck).toBeUndefined()
+    expect(switched.fingerprint.seed).toBe(profile.fingerprint.seed)
+    const reopened = new ProfileStore(repository.vaultPath)
+    await reopened.initialize()
+    expect(reopened.get(profile.id).proxy.v2rayNodeId).toBe('22222222-2222-2222-2222-222222222222')
+  })
+
+  it('rejects a node switch on a running profile or a non-v2ray proxy', async () => {
+    const repository = await store()
+    const profile = await repository.create(defaultProfileDraft())
+    await expect(repository.setV2rayNode(profile.id, '11111111-1111-1111-1111-111111111111')).rejects.toThrow('未使用 v2ray')
+
+    const v2ray = await repository.create({
+      ...defaultProfileDraft(),
+      proxy: { protocol: 'v2ray', host: '', username: '', password: '', v2rayNodeId: '11111111-1111-1111-1111-111111111111' }
+    })
+    await repository.setRuntime(v2ray.id, { status: 'running' })
+    await expect(repository.setV2rayNode(v2ray.id, '22222222-2222-2222-2222-222222222222')).rejects.toThrow('请先关闭')
+  })
+
   it('persists favorite state without changing the fingerprint seed', async () => {
     const repository = await store()
     const profile = await repository.create(defaultProfileDraft())

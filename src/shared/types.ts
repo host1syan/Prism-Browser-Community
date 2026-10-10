@@ -13,7 +13,11 @@ export type HardwareProfileId =
   | 'windows-10-rtx3060'
   | 'windows-11-rtx4060'
   | 'windows-11-rtx4070'
-export type ProxyProtocol = 'direct' | 'http' | 'https' | 'socks5'
+export type ProxyProtocol = 'direct' | 'http' | 'https' | 'socks5' | 'v2ray'
+export type V2rayNodeProtocol = 'vmess' | 'vless' | 'trojan' | 'shadowsocks'
+export type V2rayTransport = 'tcp' | 'ws' | 'grpc' | 'http' | 'kcp' | 'quic'
+export type V2raySecurity = 'none' | 'tls' | 'reality'
+export type V2raySubscriptionSource = 'url' | 'manual'
 export type WebRtcPolicy = 'proxy_only' | 'public_only' | 'default'
 export type NetworkIdentityMode = 'manual' | 'proxy'
 export type ProxyExitPolicy = 'warn' | 'block'
@@ -22,24 +26,6 @@ export interface ProfileLaunchOptions {
   allowGeoConflict?: boolean
 }
 export type EnginePreference = 'auto' | 'bundled' | 'system'
-export type ProEntitlement =
-  | 'automation-api'
-  | 'scheduler'
-  | 'mcp'
-
-export interface LicenseStatus {
-  plan: 'community' | 'pro'
-  state: 'community' | 'active' | 'maintenance-expired' | 'invalid' | 'unavailable'
-  activationAvailable: boolean
-  message: string
-  deviceId?: string
-  licenseId?: string
-  issuedAt?: string
-  leaseExpiresAt?: string
-  maintenanceUntil?: string
-  entitlements: ProEntitlement[]
-}
-
 export interface ProductAnnouncement {
   id: string
   title: string
@@ -135,6 +121,10 @@ export interface ProxyConfig {
   username: string
   password: string
   passwordStored?: boolean
+  /** Set only when protocol is 'v2ray'; identifies the node in the local v2ray store. */
+  v2rayNodeId?: string
+  /** Main-process only. Never persisted and never sent to the renderer. */
+  v2rayRelay?: { host: string; port: number }
 }
 
 export interface FingerprintConfig {
@@ -327,6 +317,87 @@ export interface ProxyCheckSummary extends ProxyTestResult {
   checkedAt: string
 }
 
+/** A parsed v2ray node. Secrets (uuid/password) stay in the main process and are
+ * stripped before any node reaches the renderer. */
+export interface V2rayNode {
+  id: string
+  subscriptionId: string
+  name: string
+  protocol: V2rayNodeProtocol
+  address: string
+  port: number
+  /** vmess/vless only. */
+  uuid?: string
+  /** trojan/shadowsocks only. */
+  password?: string
+  /** vmess alterId, shadowsocks method, vless encryption. */
+  alterId?: number
+  cipher?: string
+  encryption?: string
+  flow?: string
+  security: V2raySecurity
+  /** TLS/REALITY server name. */
+  sni?: string
+  /** vless REALITY public key. */
+  publicKey?: string
+  shortId?: string
+  fingerprint?: string
+  alpn?: string[]
+  transport: V2rayTransport
+  /** ws/http host header. */
+  host?: string
+  /** ws/grpc/http path or grpc service name. */
+  path?: string
+  /** Present when the node came from a link we could not fully map; surfaced in the UI. */
+  parseWarning?: string
+}
+
+export interface V2rayNodeView extends Omit<V2rayNode, 'uuid' | 'password'> {
+  hasCredentials: boolean
+  /** Last speed test, persisted so the result survives subscription refreshes. */
+  test?: V2rayNodeTestResult
+}
+
+export interface V2raySubscription {
+  id: string
+  name: string
+  source: V2raySubscriptionSource
+  /** Sanitized origin of the subscription URL, safe to display. */
+  displayUrl: string
+  nodeCount: number
+  createdAt: string
+  updatedAt: string
+  lastError?: string
+}
+
+export interface V2rayNodeTestResult {
+  ok: boolean
+  latencyMs: number
+  /** ISO timestamp of the measurement. */
+  testedAt: string
+  error?: string
+  failureKind?: 'authentication' | 'timeout' | 'connection' | 'unknown'
+  ip?: string
+  country?: string
+  countryCode?: string
+  timezone?: string
+}
+
+export interface V2raySubscriptionDraft {
+  name: string
+  source: V2raySubscriptionSource
+  /** Subscription URL for 'url', raw subscription text or share links for 'manual'. */
+  content: string
+}
+
+export interface V2rayCoreStatus {
+  installed: boolean
+  version?: string
+  path?: string
+  source?: 'downloaded' | 'imported'
+  message: string
+}
+
 export interface ProfileStorageInfo {
   path: string
   totalBytes: number
@@ -452,6 +523,8 @@ export interface BrowserApi {
     diagnose: (id: string) => Promise<LaunchDiagnosticReport>
     crashHistory: (id: string) => Promise<BrowserCrashRecord[]>
     setFavorite: (id: string, favorite: boolean) => Promise<BrowserProfileView>
+    /** Repoints a v2ray profile at another node. Closed profiles only. */
+    setV2rayNode: (id: string, nodeId: string) => Promise<BrowserProfileView>
     classifyMany: (ids: string[], patch: ProfileBatchClassification) => Promise<BrowserProfileView[]>
     removeMany: (ids: string[]) => Promise<void>
     onChanged: (listener: (profile: BrowserProfileView) => void) => () => void
@@ -485,17 +558,20 @@ export interface BrowserApi {
   proxy: {
     test: (config: ProxyConfig, profileId?: string) => Promise<ProxyTestResult>
   }
+  v2ray: {
+    subscriptions: () => Promise<V2raySubscription[]>
+    addSubscription: (draft: V2raySubscriptionDraft) => Promise<V2raySubscription>
+    refreshSubscription: (id: string) => Promise<V2raySubscription>
+    removeSubscription: (id: string) => Promise<void>
+    nodes: (subscriptionId?: string) => Promise<V2rayNodeView[]>
+    testNode: (nodeId: string) => Promise<V2rayNodeTestResult>
+    coreStatus: () => Promise<V2rayCoreStatus>
+    installCore: () => Promise<V2rayCoreStatus>
+    importCore: () => Promise<V2rayCoreStatus | null>
+  }
   diagnostics: {
     sessionHealth: () => Promise<AppRecoveryStatus>
     e2eQuit: () => Promise<void>
-  }
-  licensing: {
-    status: () => Promise<LicenseStatus>
-    sync: () => Promise<LicenseStatus>
-    activate: (activationCode: string) => Promise<LicenseStatus>
-    deactivate: () => Promise<LicenseStatus>
-    openPurchase: () => Promise<void>
-    onChanged: (listener: (status: LicenseStatus) => void) => () => void
   }
   automation: {
     status: () => Promise<AutomationStatus>

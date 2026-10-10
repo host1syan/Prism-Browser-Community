@@ -48,7 +48,7 @@ export function parseProfileConfig(raw: string): ProfileDraft {
   if (!value || typeof value !== 'object') throw new Error('环境配置文件格式无效')
   const data = value as Partial<ProfileExportFile>
   if (data.type !== PROFILE_EXPORT_MARKER || data.schemaVersion !== 1 || !data.profile) {
-    throw new Error('不是受支持的 Prism Browser 环境配置文件')
+    throw new Error('不是受支持的 Yk 指纹浏览器环境配置文件')
   }
   const candidate = data.profile as ProfileDraft
   const draft = validateProfileDraft({

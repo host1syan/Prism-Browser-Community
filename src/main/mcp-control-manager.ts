@@ -5,8 +5,6 @@ import type { McpPermissionStore } from './mcp-permission-store'
 import type { ProfileStore } from './profile-store'
 import { safeErrorText } from './redaction'
 
-interface McpLicenseAuthority { has(entitlement: 'mcp'): boolean }
-
 function publicMcpProfile(profile: BrowserProfile) {
   return {
     id: profile.id,
@@ -27,7 +25,6 @@ export class McpControlManager {
     private readonly permissions: McpPermissionStore,
     private readonly profiles: ProfileStore,
     private readonly launcher: BrowserLauncher,
-    private readonly licensing: McpLicenseAuthority,
     private readonly audit: McpAuditLog,
     private readonly onChanged: (status: McpStatus) => void
   ) {}
@@ -37,7 +34,6 @@ export class McpControlManager {
   permissionList(): McpProfilePermission[] { return this.permissions.list() }
 
   async setPermission(profileId: string, enabled: boolean): Promise<McpProfilePermission[]> {
-    if (enabled && !this.licensing.has('mcp')) throw new Error('本地 AI 控制需要 Prism Pro 授权')
     this.profiles.get(profileId)
     const result = await this.permissions.set(profileId, enabled)
     this.audit.record({ action: enabled ? 'permission-enable' : 'permission-disable', outcome: 'success', profileId })
@@ -64,7 +60,6 @@ export class McpControlManager {
   }
 
   async handleAgentRequest(method: string, params: Record<string, unknown> | undefined, requestId: string): Promise<unknown> {
-    if (!this.licensing.has('mcp')) throw new Error('MCP 权限不可用')
     if (method === 'mcp.session.start' || method === 'mcp.session.stop') {
       const sessionId = params?.sessionId
       if (typeof sessionId !== 'string' || !/^[a-f\d-]{36}$/i.test(sessionId)) throw new Error('MCP 会话 ID 无效')

@@ -172,31 +172,9 @@ Open the **Browser Kernels** page in Prism Browser and select **Import Local Bui
 
 Verify the kernel after importing it, then make it the active kernel. Existing profiles retain their data and settings.
 
-## Community and Pro
+## Free and local
 
-Community includes the complete local browser-profile management experience and remains free to use. Prism Pro adds professional features for automation, recurring workflows, and local AI collaboration.
-
-| Feature | Community | Prism Pro |
-| --- | :---: | :---: |
-| Unlimited local browser profiles | ✓ | ✓ |
-| Fingerprint configuration, proxies, and WebRTC leak prevention | ✓ | ✓ |
-| Independent cookies, cache, extensions, and browser data | ✓ | ✓ |
-| Profile duplication, groups, bulk operations, and local migration | ✓ | ✓ |
-| Community fingerprint kernel distributed with the app | ✓ | ✓ |
-| Officially distributed newer kernels | — | ✓ |
-| Local automation API | — | ✓ |
-| Local scheduled tasks | — | ✓ |
-| Local AI control through MCP | — | ✓ |
-
-### Pro Features
-
-- **Official newer kernels**: use newer kernels distributed with Prism Browser releases without compiling them locally.
-- **Local automation API**: query, launch, and close selected browser profiles on the local machine using a temporary access token. The API is not exposed to the public internet.
-- **Local scheduled tasks**: automatically launch and close profiles once, daily, or weekly for recurring local workflows.
-- **Local AI through MCP**: grant an AI access only to selected profiles. It can visit pages, read page content, click elements, and fill forms; access can be stopped or revoked at any time.
-- **Local-first data**: both Community and Pro store profile data on the user's device. Upgrading does not upload browser profiles, cookies, extension data, or proxy credentials.
-
-Pro is licensed for one device for one year. One activation code can be bound to one device at a time. After deactivation, the remaining license term can be used on another device. Expiration or deactivation does not delete local profiles, and Community features remain available.
+Everything runs on the local machine; there is no account, subscription, or activation. The local automation API, scheduled tasks, and local AI control through MCP are part of the free build, and the fingerprint kernel ships with the app.
 
 ## Security Reports
 

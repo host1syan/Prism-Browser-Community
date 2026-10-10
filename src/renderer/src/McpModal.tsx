@@ -9,7 +9,6 @@ interface McpModalProps {
   status: McpStatus | null
   permissions: McpProfilePermission[]
   profiles: BrowserProfileView[]
-  proEnabled: boolean
   onStatusChanged: (status: McpStatus) => void
   onPermissionsChanged: (permissions: McpProfilePermission[]) => void
   onClose: () => void
@@ -23,7 +22,7 @@ function connectionJson(connection: McpConnection): string {
   }, null, 2)
 }
 
-export function McpModal({ open, status, permissions, profiles, proEnabled, onStatusChanged, onPermissionsChanged, onClose }: McpModalProps) {
+export function McpModal({ open, status, permissions, profiles, onStatusChanged, onPermissionsChanged, onClose }: McpModalProps) {
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [configuration, setConfiguration] = useState('')
@@ -76,14 +75,14 @@ export function McpModal({ open, status, permissions, profiles, proEnabled, onSt
     <Modal open={open} width={820} title={<Space><RobotOutlined />{t("本地 AI · MCP")}</Space>} footer={null} onCancel={onClose} className="mcp-modal">
       <Space direction="vertical" size={14} style={{ width: '100%' }}>
         <Alert
-          type={proEnabled ? active ? 'success' : 'info' : 'warning'} showIcon icon={<SafetyCertificateOutlined />}
-          title={proEnabled ? mt(status?.message ?? t("MCP 尚未启动")) : t("本地 AI 控制需要 Prism Pro")}
+          type={active ? 'success' : 'info'} showIcon icon={<SafetyCertificateOutlined />}
+          title={mt(status?.message ?? t("MCP 尚未启动"))}
           description={t("AI 只能操作下方授权的环境，可以访问网页、读取内容、点击并填写表单，包括你提供的密码。")}
         />
         <div className="mcp-status-row">
           <Space><Typography.Text type="secondary">{t("状态")}</Typography.Text><Tag color={status?.state === 'running' ? 'green' : status?.state === 'ready' ? 'blue' : 'default'}>{stateLabel}</Tag></Space>
           <Space>
-            {!active ? <Button type="primary" icon={<RobotOutlined />} loading={busy === 'start'} disabled={!proEnabled || !enabled.size} onClick={() => void start()}>{t("生成 MCP 配置")}</Button>
+            {!active ? <Button type="primary" icon={<RobotOutlined />} loading={busy === 'start'} disabled={!enabled.size} onClick={() => void start()}>{t("生成 MCP 配置")}</Button>
               : <Button loading={busy === 'stop'} onClick={() => void stop(false)}>{t("停止 MCP")}</Button>}
             <Popconfirm title={t("紧急停止 AI 控制？")} description={t("将断开 MCP，并关闭本次由 MCP 启动的环境。共享的本地自动化 API 也会停止。")} okText={t("紧急停止")} cancelText={t("取消")} okButtonProps={{ danger: true }} onConfirm={() => stop(true)}>
               <Button danger icon={<StopOutlined />} disabled={!active || Boolean(busy)}>{t("紧急停止")}</Button>
@@ -101,7 +100,7 @@ export function McpModal({ open, status, permissions, profiles, proEnabled, onSt
                 <div className="mcp-profile" key={profile.id}>
                   <span className="profile-color" style={{ background: profile.color }} />
                   <div><strong>#{profile.serialNumber} · {profile.name}</strong><small>{profile.group || t("未分组")} · {profile.status === 'running' ? t("运行中") : t("已关闭")}</small></div>
-                  <Switch checked={allowed} loading={busy === profile.id} disabled={busy === profile.id || !proEnabled && !allowed} onChange={(value) => void setPermission(profile.id, value)} />
+                  <Switch checked={allowed} loading={busy === profile.id} disabled={busy === profile.id} onChange={(value) => void setPermission(profile.id, value)} />
                 </div>
               )
             })}
@@ -112,7 +111,7 @@ export function McpModal({ open, status, permissions, profiles, proEnabled, onSt
           <section className="mcp-configuration">
             <div className="mcp-section-heading"><div><strong><LockOutlined /> {t("一次性客户端配置")}</strong><span>{t("粘贴到本地 AI 客户端的 MCP 配置中")}</span></div><Button icon={<CopyOutlined />} onClick={() => void copy()}>{copied ? t("已复制") : t("复制配置")}</Button></div>
             <Input.TextArea value={configuration} readOnly autoSize={{ minRows: 7, maxRows: 12 }} spellCheck={false} />
-            <Alert type="warning" showIcon title={t("请勿分享连接配置")} description={t("关闭 MCP 或退出 Prism 后，此配置会失效；使用期间请保持 Prism 运行。")} />
+            <Alert type="warning" showIcon title={t("请勿分享连接配置")} description={t("关闭 MCP 或退出 Yk 指纹浏览器 后，此配置会失效；使用期间请保持 Yk 指纹浏览器 运行。")} />
           </section>
         )}
       </Space>

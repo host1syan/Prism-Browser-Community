@@ -40,23 +40,13 @@ Nếu hệ thống chặn bản chưa ký, xác nhận mở trong **Cài đặt 
 
 Mỗi hồ sơ dùng một thư mục dữ liệu riêng. Nhân bản giữ nguyên cài đặt nhưng tạo danh tính và giá trị hạt giống (seed) mới.
 
-## Tính năng và phiên bản
+## Tính năng
+
+Mọi thứ chạy trên máy cục bộ: không có tài khoản, gói đăng ký hay kích hoạt. API tự động hóa cục bộ, tác vụ theo lịch và điều khiển AI cục bộ qua MCP đều thuộc bản miễn phí, còn nhân dấu vân tay đi kèm ứng dụng.
 
 Community cung cấp hồ sơ cục bộ không giới hạn, dữ liệu độc lập, proxy HTTP/HTTPS/SOCKS5 và chống rò rỉ WebRTC. Có thể cấu hình User-Agent, ngôn ngữ, múi giờ, màn hình, CPU, bộ nhớ và GPU, với tính nhất quán giữa Canvas, WebGL, Audio, DOMRect, phông chữ, Speech và WebGPU.
 
 Có nhân bản, nhóm, thẻ, mục yêu thích, thao tác hàng loạt, thùng rác và di chuyển cục bộ cookie, từng hồ sơ hoặc toàn bộ không gian làm việc. Biểu tượng Dock trên macOS và thanh tác vụ Windows có thể hiển thị số hồ sơ.
-
-| Tính năng | Community | Prism Pro |
-| --- | :---: | :---: |
-| Hồ sơ cục bộ không giới hạn, dấu vân tay, proxy và dữ liệu độc lập | ✓ | ✓ |
-| Nhóm, nhân bản, thao tác hàng loạt và di chuyển cục bộ | ✓ | ✓ |
-| Bộ máy Community đi kèm ứng dụng | ✓ | ✓ |
-| Bộ máy mới hơn do nhà phát triển phát hành chính thức | — | ✓ |
-| API tự động hóa cục bộ, tác vụ định kỳ và AI điều khiển qua MCP | — | ✓ |
-
-API Pro dùng mã truy cập tạm thời và không mở ra Internet công cộng. Tác vụ có thể chạy một lần, hằng ngày hoặc hằng tuần. MCP chỉ cho AI truy cập hồ sơ được cấp quyền; có thể dừng hoặc thu hồi bất cứ lúc nào. Nâng cấp Pro không tải hồ sơ, cookie, dữ liệu tiện ích hay thông tin xác thực proxy lên máy chủ.
-
-Giấy phép Pro có thời hạn một năm, mỗi mã kích hoạt chỉ gắn với một thiết bị tại một thời điểm. Sau khi hủy kích hoạt, thời hạn còn lại có thể dùng trên thiết bị khác. Hết hạn hoặc hủy kích hoạt không xóa hồ sơ; các tính năng Community vẫn sử dụng được.
 
 ## Phạm vi kiểm chứng
 

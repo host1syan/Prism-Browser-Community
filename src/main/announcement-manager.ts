@@ -3,8 +3,34 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AnnouncementStatus, ProductAnnouncement } from '../shared/types'
 import type { Logger } from './app-logger'
-import { canonicalJson } from './license-crypto'
-import { activationUrl, validateConfig } from './license-manager'
+
+interface AnnouncementConfig {
+  schemaVersion: 1
+  announcementsBaseUrl: string
+  announcementsPublicKey: string
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+  return `{${Object.entries(value as Record<string, unknown>)
+    .sort(([first], [second]) => first < second ? -1 : first > second ? 1 : 0)
+    .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+    .join(',')}}`
+}
+
+function validateAnnouncementConfig(value: unknown): AnnouncementConfig {
+  const config = value as Partial<AnnouncementConfig>
+  if (!config || config.schemaVersion !== 1
+    || typeof config.announcementsBaseUrl !== 'string'
+    || typeof config.announcementsPublicKey !== 'string'
+    || createPublicKey(config.announcementsPublicKey).asymmetricKeyType !== 'ed25519') {
+    throw new Error('公告服务配置无效')
+  }
+  const base = new URL(config.announcementsBaseUrl)
+  if (base.protocol !== 'https:') throw new Error('公告服务配置无效')
+  return config as AnnouncementConfig
+}
 
 interface AnnouncementPayload extends ProductAnnouncement {
   schemaVersion: 1
@@ -101,9 +127,9 @@ export class AnnouncementManager {
 
   async check(): Promise<AnnouncementStatus> {
     try {
-      const path = this.configOverride ?? join(this.resourcesPath, 'license-config.json')
-      const config = validateConfig(JSON.parse(await readFile(path, 'utf8')))
-      const response = await this.fetchImpl(activationUrl(config.activationBaseUrl, '/v1/announcements/current'), {
+      const path = this.configOverride ?? join(this.resourcesPath, 'announcements-config.json')
+      const config = validateAnnouncementConfig(JSON.parse(await readFile(path, 'utf8')))
+      const response = await this.fetchImpl(new URL('/v1/announcements/current', config.announcementsBaseUrl).toString(), {
         method: 'GET',
         redirect: 'error',
         headers: { accept: 'application/json', 'user-agent': `Prism-Browser/${this.currentVersion}` },
@@ -120,7 +146,7 @@ export class AnnouncementManager {
         this.current = { state: 'none', message: '暂无公告' }
         return this.status()
       }
-      const announcement = validateSignedAnnouncement(envelope.announcement, config.licensePublicKey)
+      const announcement = validateSignedAnnouncement(envelope.announcement, config.announcementsPublicKey)
       const compatible = announcement.platforms.includes('all')
         || announcement.platforms.includes(this.platform as 'darwin' | 'win32')
       const expired = announcement.expiresAt !== undefined && Date.parse(announcement.expiresAt) <= this.now()
@@ -142,4 +168,4 @@ export class AnnouncementManager {
   }
 }
 
-export { compareVersions, validateSignedAnnouncement }
+export { compareVersions, validateSignedAnnouncement, validateAnnouncementConfig }

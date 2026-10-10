@@ -2,6 +2,9 @@ import type { BrowserProfile, BrowserProfileView, ProxyConfig } from '../shared/
 import { redactSensitiveText } from './redaction'
 
 export function sameProxyIdentity(first: ProxyConfig, second: ProxyConfig): boolean {
+  if (first.protocol === 'v2ray' || second.protocol === 'v2ray') {
+    return first.protocol === second.protocol && first.v2rayNodeId === second.v2rayNodeId
+  }
   return first.protocol === second.protocol
     && first.host.trim() === second.host.trim()
     && first.port === second.port

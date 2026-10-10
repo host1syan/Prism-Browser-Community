@@ -20,9 +20,14 @@ import { GEOIP_CONFLICT_CONFIRMATION_PREFIX, hasCompleteProxyIdentity, proxyLaun
 import { sameProxyIdentity } from './profile-secrets'
 import { BrowserControlSession, PipeCdpTransport } from './browser-control-session'
 import type { Readable, Writable } from 'node:stream'
-import { kernelRequiresPro } from '../shared/kernel-policy'
 
 type ProxyTester = (config: ProxyConfig) => Promise<ProxyTestResult>
+
+/** Narrow view of V2rayManager so the launcher stays testable without Xray. */
+export interface V2rayRelayController {
+  ensureRunning: (profileId: string, nodeId: string) => Promise<{ host: string; port: number }>
+  stop: (profileId: string) => Promise<void>
+}
 
 interface RunningBrowser {
   process: ChildProcess
@@ -75,7 +80,7 @@ export class BrowserLauncher {
   private activeLaunches = 0
   private readonly launchWaiters: Array<() => void> = []
   private closeAllOperation?: Promise<void>
-  private canUseProKernel: () => boolean = () => true
+  private v2ray: V2rayRelayController | undefined
 
   constructor(
     private readonly profiles: ProfileStore,
@@ -97,8 +102,22 @@ export class BrowserLauncher {
     }
   }
 
-  setProKernelAccessCheck(check: () => boolean): void {
-    this.canUseProKernel = check
+  /** Injected after construction because the relay store is created later. */
+  setV2rayManager(manager: V2rayRelayController): void {
+    this.v2ray = manager
+  }
+
+  /**
+   * Starts the profile's Xray relay and returns the profile with the relay
+   * endpoint attached, or the profile unchanged when it does not use v2ray.
+   */
+  private async attachV2rayRelay(profile: BrowserProfile): Promise<BrowserProfile> {
+    if (profile.proxy.protocol !== 'v2ray') return profile
+    const nodeId = profile.proxy.v2rayNodeId
+    if (!nodeId) throw new Error('该环境使用 v2ray 代理，但没有选择节点')
+    if (!this.v2ray) throw new Error('v2ray 支持尚未初始化')
+    const relay = await this.v2ray.ensureRunning(profile.id, nodeId)
+    return { ...profile, proxy: { ...profile.proxy, v2rayRelay: relay } }
   }
 
   async initialize(): Promise<void> {
@@ -172,10 +191,15 @@ export class BrowserLauncher {
         ? `环境绑定的内核 ${profile.kernelVersion} 不可用，请先安装该版本或修改环境配置`
         : '没有找到浏览器内核，请先选择 Fingerprint Chromium 可执行文件')
     }
-    if (kernelRequiresPro(engine.version) && !this.canUseProKernel()) {
-      throw new Error(`Chromium ${engine.version} 是 Prism Pro 内核，请先激活 Pro 或将环境切换回 144 稳定内核`)
+    // The relay must be up before the pre-launch exit check, otherwise a v2ray
+    // profile would be tested against a node that is not listening yet. The
+    // check returns a profile reloaded from the store, so the relay is attached
+    // again afterwards; ensureRunning is idempotent for the same node.
+    profile = await this.attachV2rayRelay(profile)
+    if (profile.proxy.protocol !== 'direct') {
+      profile = await this.refreshProxyForLaunch(profile, options.allowGeoConflict === true)
+      profile = await this.attachV2rayRelay(profile)
     }
-    if (profile.proxy.protocol !== 'direct') profile = await this.refreshProxyForLaunch(profile, options.allowGeoConflict === true)
     const hostHardware = hostHardwareSnapshot()
     const selectedHardware = hardwareProfile(profile.fingerprint.hardwareProfileId)
     if (selectedHardware?.hostMatched && selectedHardware.platform !== hostHardware.platform) {
@@ -272,6 +296,7 @@ export class BrowserLauncher {
         try {
           const cleanup = await Promise.allSettled([
             closeProxyBridge(localProxyUrl),
+            this.v2ray?.stop(id) ?? Promise.resolve(),
             rm(join(runtimePath, 'process.json'), { force: true })
           ])
           for (const result of cleanup) {
@@ -376,7 +401,7 @@ export class BrowserLauncher {
       return this.profiles.get(id)
     } catch (error) {
       this.logger?.error('浏览器环境启动流程失败', { profileId: id, error: error instanceof Error ? error.message : String(error) })
-      await closeProxyBridge(localProxyUrl)
+      await Promise.allSettled([closeProxyBridge(localProxyUrl), this.v2ray?.stop(id) ?? Promise.resolve()])
       const safeError = safeErrorText(error)
       const next = await this.profiles.setRuntime(id, {
         status: 'error',
@@ -499,6 +524,18 @@ export class BrowserLauncher {
     }
     void operation.then(clearOperation, clearOperation)
     return operation
+  }
+
+  /** Tears down relays for profiles that are not tracked as running, which can
+   * happen when the launch flow failed after the relay came up. */
+  async stopV2rayRelays(): Promise<void> {
+    const ids = new Set([
+      ...this.processes.keys(),
+      ...this.orphanProcesses.keys(),
+      ...this.launchOperations.keys(),
+      ...this.closeOperations.keys()
+    ])
+    await Promise.allSettled([...ids].map((id) => this.v2ray?.stop(id) ?? Promise.resolve()))
   }
 
   private closeAllState(): string[] {

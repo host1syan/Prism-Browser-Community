@@ -7,12 +7,11 @@ import type { AutomationStartResult, AutomationStatus } from '../../shared/types
 interface AutomationModalProps {
   open: boolean
   status: AutomationStatus | null
-  proEnabled: boolean
   onChanged: (status: AutomationStatus) => void
   onClose: () => void
 }
 
-export function AutomationModal({ open, status, proEnabled, onChanged, onClose }: AutomationModalProps) {
+export function AutomationModal({ open, status, onChanged, onClose }: AutomationModalProps) {
   const [busy, setBusy] = useState(false)
   const [token, setToken] = useState('')
   const [error, setError] = useState('')
@@ -43,10 +42,10 @@ export function AutomationModal({ open, status, proEnabled, onChanged, onClose }
     <Modal open={open} width={650} title={<Space><ApiOutlined />{t("本地自动化 API")}</Space>} footer={null} onCancel={onClose} className="automation-modal">
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
         <Alert
-          type={running ? 'success' : proEnabled ? 'info' : 'warning'}
+          type={running ? 'success' : 'info'}
           showIcon
           icon={<SafetyCertificateOutlined />}
-          title={running ? t("API 已启动，仅当前设备可访问") : proEnabled ? t("默认关闭，按需启动") : t("此功能需要 Prism Pro")}
+          title={running ? t("API 已启动，仅当前设备可访问") : t("默认关闭，按需启动")}
           description={t("API 可以查询、启动和关闭浏览器环境，不能读取浏览器数据。")}
         />
 
@@ -81,7 +80,7 @@ export function AutomationModal({ open, status, proEnabled, onChanged, onClose }
 
         <div className="automation-actions">
           {!running ? (
-            <Button type="primary" icon={<ApiOutlined />} loading={busy} disabled={!proEnabled || status?.state === 'starting'} onClick={() => void run(() => window.browserApi.automation.start(), true)}>{t("启动本地 API")}</Button>
+            <Button type="primary" icon={<ApiOutlined />} loading={busy} disabled={status?.state === 'starting'} onClick={() => void run(() => window.browserApi.automation.start(), true)}>{t("启动本地 API")}</Button>
           ) : (
             <Button loading={busy} onClick={() => void run(() => window.browserApi.automation.stop())}>{t("停止 API")}</Button>
           )}

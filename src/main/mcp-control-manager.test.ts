@@ -34,11 +34,10 @@ async function fixture() {
     clickPageElement: vi.fn(async () => ({ url: 'https://example.com/next', title: 'Next', readyState: 'complete' })),
     typePageElement: vi.fn(async () => ({ url: 'https://example.com/', title: 'Test', readyState: 'complete' }))
   }
-  const licensing = { has: vi.fn(() => true) }
   const changed = vi.fn()
-  const manager = new McpControlManager(permissions, profiles as never, launcher as never, licensing, audit, changed)
+  const manager = new McpControlManager(permissions, profiles as never, launcher as never, audit, changed)
   await manager.initialize()
-  return { root, permissions, audit, items, profiles, launcher, licensing, changed, manager }
+  return { root, permissions, audit, items, profiles, launcher, changed, manager }
 }
 
 describe('McpControlManager', () => {
@@ -98,14 +97,16 @@ describe('McpControlManager', () => {
     expect(audit).not.toContain('test-password-secret')
   })
 
-  it('allows revoking existing access without Pro but blocks granting new access', async () => {
+  it('grants and revokes access without any entitlement gate', async () => {
     const item = await fixture()
     await item.manager.setPermission('profile-1', true)
-    item.licensing.has.mockReturnValue(false)
     await expect(item.manager.setPermission('profile-1', false)).resolves.toEqual([
       expect.objectContaining({ profileId: 'profile-1', enabled: false })
     ])
-    await expect(item.manager.setPermission('profile-2', true)).rejects.toThrow('需要 Prism Pro')
+    await expect(item.manager.setPermission('profile-2', true)).resolves.toEqual([
+      expect.objectContaining({ profileId: 'profile-1', enabled: false }),
+      expect.objectContaining({ profileId: 'profile-2', enabled: true })
+    ])
   })
 
   it('persists permissions and keeps secrets out of the MCP audit', async () => {

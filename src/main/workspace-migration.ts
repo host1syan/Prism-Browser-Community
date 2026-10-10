@@ -339,7 +339,7 @@ export class WorkspaceMigrationManager {
     try {
       const prefix = Buffer.alloc(MAGIC.length + 4)
       await readExactAt(handle, prefix, 0)
-      if (!prefix.subarray(0, MAGIC.length).equals(MAGIC)) throw new Error('不是受支持的 Prism 全部环境迁移包')
+      if (!prefix.subarray(0, MAGIC.length).equals(MAGIC)) throw new Error('不是受支持的 Yk 指纹浏览器全部环境迁移包')
       const headerLength = prefix.readUInt32BE(MAGIC.length)
       if (headerLength <= 0 || headerLength > MAX_HEADER_BYTES) throw new Error('迁移包头长度无效')
       headerBytes = Buffer.alloc(headerLength)

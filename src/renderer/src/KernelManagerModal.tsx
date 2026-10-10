@@ -1,16 +1,14 @@
 import { t, translateMessage as mt } from '../../shared/i18n'
-import { CheckCircleFilled, CrownOutlined, DeleteOutlined, FolderOpenOutlined, ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { CheckCircleFilled, DeleteOutlined, FolderOpenOutlined, ReloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { Alert, Button, List, Modal, Popconfirm, Space, Spin, Tag, Typography, message } from 'antd'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { EngineStatus, KernelHealth, KernelRelease } from '../../shared/types'
-import { kernelRequiresPro } from '../../shared/kernel-policy'
 
 interface KernelManagerModalProps {
   open: boolean
   engine: EngineStatus | null
   onClose: () => void
   onEngineChanged: (engine: EngineStatus) => void
-  proActive: boolean
 }
 
 function sizeLabel(size: number): string {
@@ -21,7 +19,7 @@ function errorText(error: unknown): string {
   return mt(error instanceof Error ? error.message : String(error))
 }
 
-export function KernelManagerModal({ open, engine, onClose, onEngineChanged, proActive }: KernelManagerModalProps) {
+export function KernelManagerModal({ open, engine, onClose, onEngineChanged }: KernelManagerModalProps) {
   const [releases, setReleases] = useState<KernelRelease[]>([])
   const [loading, setLoading] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
@@ -152,7 +150,7 @@ export function KernelManagerModal({ open, engine, onClose, onEngineChanged, pro
         className="kernel-notice"
         type="info"
         showIcon
-        title={t("安装新版 Prism Browser 即可更新内核")}
+        title={t("安装新版 Yk 指纹浏览器 即可更新内核")}
         description={t("也可以手动导入本地构建。")}
       />
 
@@ -189,14 +187,10 @@ export function KernelManagerModal({ open, engine, onClose, onEngineChanged, pro
           renderItem={(release) => {
             const active = currentVersion === release.version
             const bundledRelease = release.origin === 'bundled'
-            const proKernel = kernelRequiresPro(release.version)
-            const proLocked = proKernel && !proActive
             const actions: ReactNode[] = [
               active
                 ? <Tag key="active" color="success" icon={<CheckCircleFilled />}>{t("正在使用")}</Tag>
-                : <Button key="use" disabled={proLocked} onClick={() => void activate(release.version)}>
-                    {proLocked ? t("升级 Pro 后使用") : t("切换使用")}
-                  </Button>
+                : <Button key="use" onClick={() => void activate(release.version)}>{t("切换使用")}</Button>
             ]
             if (release.installed && !active && !bundledRelease) {
               actions.push(
@@ -228,7 +222,7 @@ export function KernelManagerModal({ open, engine, onClose, onEngineChanged, pro
                 actions={actions}
               >
                 <List.Item.Meta
-                  title={<Space><span>Chromium {release.version}</span>{release.installed && <Tag>{t("已安装")}</Tag>}{bundledRelease && <Tag color="blue">{t("随应用内置")}</Tag>}{release.origin === 'local-build' && <Tag color="purple">{t("本地构建")}</Tag>}{proKernel && <Tag color="gold" icon={<CrownOutlined />}>Pro</Tag>}{health[release.version]?.status === 'healthy' && <Tag color="success">{t("文件正常")}</Tag>}{health[release.version]?.status === 'unverified' && <Tag color="warning">{t("建议重新导入")}</Tag>}{health[release.version]?.status === 'corrupt' && <Tag color="error">{t("文件异常，请安装新版 Prism Browser 或重新导入本地构建")}</Tag>}</Space>}
+                  title={<Space><span>Chromium {release.version}</span>{release.installed && <Tag>{t("已安装")}</Tag>}{bundledRelease && <Tag color="blue">{t("随应用内置")}</Tag>}{release.origin === 'local-build' && <Tag color="purple">{t("本地构建")}</Tag>}{health[release.version]?.status === 'healthy' && <Tag color="success">{t("文件正常")}</Tag>}{health[release.version]?.status === 'unverified' && <Tag color="warning">{t("建议重新导入")}</Tag>}{health[release.version]?.status === 'corrupt' && <Tag color="error">{t("文件异常，请安装新版 Yk 指纹浏览器 或重新导入本地构建")}</Tag>}</Space>}
                   description={
                     <div className="kernel-meta">
                       <span>{release.size ? sizeLabel(release.size) : t("本地安装")}</span>

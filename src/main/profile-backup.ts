@@ -93,7 +93,7 @@ export class ProfileBackupManager {
     await this.profiles.assertProfileDataIdentity(profileId)
     const source = this.profiles.profileDataPath(profileId)
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-    const target = join(resolve(destinationParent), `Prism Backup - ${safeDirectoryName(profile.name)} - ${stamp}`)
+    const target = join(resolve(destinationParent), `Yk 指纹浏览器 Backup - ${safeDirectoryName(profile.name)} - ${stamp}`)
     const staging = `${target}.partial`
     ensureOutside(source, target)
     try {
@@ -138,7 +138,7 @@ export class ProfileBackupManager {
       throw new Error('备份清单不是有效 JSON')
     }
     if (manifest.schemaVersion !== 1 || !manifest.profile || typeof manifest.totalBytes !== 'number' || typeof manifest.fileCount !== 'number') {
-      throw new Error('不支持或不完整的 Prism 环境数据备份')
+      throw new Error('不支持或不完整的 Yk 指纹浏览器环境数据备份')
     }
     if (!Number.isSafeInteger(manifest.totalBytes) || manifest.totalBytes < 0 || manifest.totalBytes > MAX_BACKUP_BYTES
       || !Number.isSafeInteger(manifest.fileCount) || manifest.fileCount < 0 || manifest.fileCount > MAX_BACKUP_FILES) {

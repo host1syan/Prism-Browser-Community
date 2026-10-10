@@ -125,6 +125,7 @@ button, input, textarea { font: inherit; }
 .resolution-input { width: calc(50% - 20px) !important; }
 .resolution-times { width: 40px !important; padding-inline: 0 !important; text-align: center; }
 .proxy-test-row { margin-top: 18px; }
+.v2ray-node-row-selected > td { background: #f0f7ff !important; }
 .proxy-test-result { display: flex; flex-direction: column; gap: 5px; margin-top: 12px; padding: 12px 14px; border: 1px solid #e8ebf1; border-radius: 9px; background: #fafbfc; }
 .proxy-result-line, .proxy-timezone-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .proxy-result-line .ant-tag { margin: 0; }

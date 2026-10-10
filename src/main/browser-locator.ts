@@ -248,7 +248,7 @@ export async function locateBundledBrowser(
   return null
 }
 
-/** List the stable bundled kernel and optional side-by-side Pro kernels. */
+/** List the bundled kernel and any side-by-side kernels installed in the vault. */
 export async function listBundledBrowsers(resourcesPath = process.resourcesPath): Promise<EngineStatus[]> {
   if (!resourcesPath) return []
   const engines: EngineStatus[] = []

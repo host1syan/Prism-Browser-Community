@@ -40,23 +40,13 @@ Sistem imzasız bir sürümü engellerse macOS'ta **Sistem Ayarları → Gizlili
 
 Her profil ayrı bir veri dizini kullanır. Kopyalama, ayarları korurken yeni bir kimlik ve yeni bir başlangıç değeri (seed) oluşturur.
 
-## Özellikler ve sürümler
+## Özellikler
+
+Her şey yerel makinede çalışır: hesap, abonelik veya etkinleştirme yoktur. Yerel otomasyon API’si, zamanlanmış görevler ve MCP üzerinden yerel yapay zekâ denetimi ücretsiz sürüme dahildir; parmak izi çekirdeği uygulamayla birlikte gelir.
 
 Community; sınırsız yerel profil, bağımsız veriler, HTTP/HTTPS/SOCKS5 proxy ve WebRTC sızıntı koruması sunar. User-Agent, dil, saat dilimi, ekran, CPU, bellek ve GPU kimliği yapılandırılabilir; Canvas, WebGL, Audio, DOMRect, yazı tipleri, Speech ve WebGPU tutarlılığı desteklenir.
 
 Kopyalama, gruplar, etiketler, favoriler, toplu işlemler, çöp kutusu ve çerezlerin, profillerin veya tüm çalışma alanının yerel aktarımı desteklenir. macOS Dock ve Windows görev çubuğu simgeleri profil numarasını gösterebilir.
-
-| Özellik | Community | Prism Pro |
-| --- | :---: | :---: |
-| Sınırsız yerel profil, parmak izi, proxy ve bağımsız veri | ✓ | ✓ |
-| Gruplar, kopyalama, toplu işlemler ve yerel aktarım | ✓ | ✓ |
-| Uygulamayla gelen Community motoru | ✓ | ✓ |
-| Resmî olarak dağıtılan daha yeni motorlar | — | ✓ |
-| Yerel otomasyon API'si, zamanlanmış görevler ve MCP ile yapay zekâ kontrolü | — | ✓ |
-
-Pro API geçici bir erişim belirteci kullanır ve genel internete açılmaz. Görevler bir kez, günlük veya haftalık çalışabilir. MCP, yapay zekâya yalnızca izin verilen profillere erişim sağlar; erişim her an durdurulabilir veya geri alınabilir. Pro'ya yükseltmek profil, çerez, uzantı verisi veya proxy kimlik bilgilerini sunucuya yüklemez.
-
-Pro lisansı bir yıl geçerlidir ve bir etkinleştirme kodu aynı anda bir cihaza bağlanabilir. Devre dışı bıraktıktan sonra kalan süre başka cihazda kullanılabilir. Sürenin dolması veya devre dışı bırakma profilleri silmez; Community özellikleri kullanılmaya devam eder.
 
 ## Doğrulama
 

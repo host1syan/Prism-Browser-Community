@@ -22,14 +22,12 @@ import { proxyForTest, publicProfile, sameProxyIdentity } from './profile-secret
 import type { ProfileBackupManager } from './profile-backup'
 import type { AppSessionTracker } from './app-session'
 import type { UpdateManager } from './update-manager'
-import type { LicenseManager } from './license-manager'
 import type { WorkspaceMigrationManager } from './workspace-migration'
-import type { ProAgentManager } from './pro-agent-manager'
+import type { LocalAutomationManager } from './automation-server'
 import type { SchedulerManager } from './scheduler-manager'
 import type { McpControlManager } from './mcp-control-manager'
 import type { AnnouncementManager } from './announcement-manager'
-
-export const PRO_PURCHASE_URL = 'https://pay.ldxp.cn/item/q23itv'
+import type { V2rayManager } from './v2ray-manager'
 
 interface IpcDependencies {
   profiles: ProfileStore
@@ -43,14 +41,14 @@ interface IpcDependencies {
   workspaceMigration: WorkspaceMigrationManager
   appSession: AppSessionTracker
   updater: UpdateManager
-  licensing: LicenseManager
-  automation: ProAgentManager
+  automation: LocalAutomationManager
   scheduler: SchedulerManager
   mcp: McpControlManager
   announcements: AnnouncementManager
+  v2ray: V2rayManager
 }
 
-export function registerIpc({ profiles, settings, launcher, kernels, extensions, cookies, logger, backups, workspaceMigration, appSession, updater, licensing, automation, scheduler, mcp, announcements }: IpcDependencies): void {
+export function registerIpc({ profiles, settings, launcher, kernels, extensions, cookies, logger, backups, workspaceMigration, appSession, updater, automation, scheduler, mcp, announcements, v2ray }: IpcDependencies): void {
   ipcMain.handle('profiles:list', () => profiles.list().map(publicProfile))
   ipcMain.handle('profiles:storage-health', () => profiles.storageHealth())
   ipcMain.handle('profiles:create', async (_event, draft: ProfileDraft) => publicProfile(await profiles.create(draft)))
@@ -63,7 +61,7 @@ export function registerIpc({ profiles, settings, launcher, kernels, extensions,
     const options: Electron.SaveDialogOptions = {
       title: t('导出环境配置'),
       defaultPath: safeProfileFileName(profile.name),
-      filters: [{ name: 'Prism Browser 环境配置', extensions: ['json'] }]
+      filters: [{ name: 'Yk 指纹浏览器环境配置', extensions: ['json'] }]
     }
     const result = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options)
     if (result.canceled || !result.filePath) return null
@@ -76,7 +74,7 @@ export function registerIpc({ profiles, settings, launcher, kernels, extensions,
     const options: Electron.OpenDialogOptions = {
       title: t('导入环境配置'),
       properties: ['openFile'],
-      filters: [{ name: 'Prism Browser 环境配置', extensions: ['json'] }]
+      filters: [{ name: 'Yk 指纹浏览器环境配置', extensions: ['json'] }]
     }
     const result = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options)
     if (result.canceled || !result.filePaths[0]) return null
@@ -151,7 +149,7 @@ export function registerIpc({ profiles, settings, launcher, kernels, extensions,
   })
   ipcMain.handle('profiles:import-backup', async () => {
     const owner = BrowserWindow.getFocusedWindow()
-    const options: Electron.OpenDialogOptions = { title: t('选择 Prism 环境数据备份目录'), properties: ['openDirectory'] }
+    const options: Electron.OpenDialogOptions = { title: t('选择 Yk 指纹浏览器 环境数据备份目录'), properties: ['openDirectory'] }
     const result = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options)
     if (result.canceled || !result.filePaths[0]) return null
     const imported = await backups.import(result.filePaths[0])
@@ -164,8 +162,8 @@ export function registerIpc({ profiles, settings, launcher, kernels, extensions,
     const stamp = new Date().toISOString().slice(0, 10)
     const options: Electron.SaveDialogOptions = {
       title: t('导出全部环境加密迁移包'),
-      defaultPath: `Prism 全部环境 ${stamp}.prism-migration`,
-      filters: [{ name: 'Prism 加密迁移包', extensions: ['prism-migration'] }]
+      defaultPath: `Yk 指纹浏览器 全部环境 ${stamp}.prism-migration`,
+      filters: [{ name: 'Yk 指纹浏览器加密迁移包', extensions: ['prism-migration'] }]
     }
     const result = owner ? await dialog.showSaveDialog(owner, options) : await dialog.showSaveDialog(options)
     if (result.canceled || !result.filePath) return null
@@ -178,7 +176,7 @@ export function registerIpc({ profiles, settings, launcher, kernels, extensions,
     const options: Electron.OpenDialogOptions = {
       title: t('导入全部环境加密迁移包'),
       properties: ['openFile'],
-      filters: [{ name: 'Prism 加密迁移包', extensions: ['prism-migration'] }]
+      filters: [{ name: 'Yk 指纹浏览器加密迁移包', extensions: ['prism-migration'] }]
     }
     const result = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options)
     if (result.canceled || !result.filePaths[0]) return null
@@ -265,6 +263,11 @@ export function registerIpc({ profiles, settings, launcher, kernels, extensions,
   ipcMain.handle('profiles:diagnose', (_event, id: string) => launcher.diagnose(id))
   ipcMain.handle('profiles:crash-history', (_event, id: string) => launcher.crashHistory(id))
   ipcMain.handle('profiles:set-favorite', async (_event, id: string, favorite: boolean) => publicProfile(await profiles.setFavorite(id, favorite)))
+  ipcMain.handle('profiles:set-v2ray-node', async (_event, id: string, nodeId: string) => {
+    const profile = await profiles.setV2rayNode(id, nodeId)
+    logger.info('环境已切换 v2ray 节点', { profileId: id, nodeId })
+    return publicProfile(profile)
+  })
   ipcMain.handle('profiles:classify-many', async (_event, ids: string[], patch) => {
     return (await profiles.classifyMany(ids, patch)).map(publicProfile)
   })
@@ -342,7 +345,7 @@ export function registerIpc({ profiles, settings, launcher, kernels, extensions,
       return {
         version,
         status: 'healthy',
-        message: '随 Prism Browser 发布的内核完整性正常',
+        message: '随 Yk 指纹浏览器发布的内核完整性正常',
         checkedAt: new Date().toISOString()
       }
     }
@@ -362,22 +365,44 @@ export function registerIpc({ profiles, settings, launcher, kernels, extensions,
     if (status.state !== 'available' || !status.announcement?.action) throw new Error('当前公告没有可打开的链接')
     await shell.openExternal(status.announcement.action.url)
   })
-  ipcMain.handle('proxy:test', (_event, config, profileId?: string) => {
+  ipcMain.handle('proxy:test', async (_event, config, profileId?: string) => {
     const validated = validateProxyConfig(config)
     const profile = profileId ? profiles.get(profileId) : undefined
-    return testProxy(proxyForTest(validated, profile))
+    const candidate = proxyForTest(validated, profile)
+    if (candidate.protocol !== 'v2ray') return testProxy(candidate)
+    // A v2ray profile is only testable through its relay, so the probe starts
+    // the same sidecar the launch path would use.
+    const nodeId = candidate.v2rayNodeId
+    if (!nodeId) throw new Error('请选择 v2ray 节点')
+    const probeId = `probe-${profileId ?? 'draft'}`
+    try {
+      const relay = await v2ray.ensureRunning(probeId, nodeId)
+      return await testProxy({ ...candidate, v2rayRelay: relay })
+    } finally {
+      await v2ray.stop(probeId)
+    }
+  })
+  ipcMain.handle('v2ray:subscriptions', () => v2ray.listSubscriptions())
+  ipcMain.handle('v2ray:add-subscription', (_event, draft) => v2ray.addSubscription(draft))
+  ipcMain.handle('v2ray:refresh-subscription', (_event, id: string) => v2ray.refreshSubscription(id))
+  ipcMain.handle('v2ray:remove-subscription', (_event, id: string) => v2ray.removeSubscription(id))
+  ipcMain.handle('v2ray:nodes', (_event, subscriptionId?: string) => v2ray.listNodes(subscriptionId))
+  ipcMain.handle('v2ray:test-node', (_event, nodeId: string) => v2ray.testNode(nodeId))
+  ipcMain.handle('v2ray:core-status', () => v2ray.coreStatus())
+  ipcMain.handle('v2ray:install-core', () => v2ray.installCore())
+  ipcMain.handle('v2ray:import-core', async () => {
+    const selection = await dialog.showOpenDialog({
+      title: t('选择 Xray 内核可执行文件'),
+      properties: ['openFile'],
+      filters: process.platform === 'win32' ? [{ name: 'Xray', extensions: ['exe'] }] : undefined
+    })
+    if (selection.canceled || !selection.filePaths[0]) return null
+    return v2ray.importCore(selection.filePaths[0])
   })
   ipcMain.handle('diagnostics:session-health', () => appSession.recoveryStatus())
   if (process.env.PRISM_E2E === '1') {
     ipcMain.handle('diagnostics:e2e-quit', () => app.quit())
   }
-  ipcMain.handle('licensing:status', () => licensing.status())
-  ipcMain.handle('licensing:sync', () => licensing.synchronize())
-  ipcMain.handle('licensing:activate', (_event, activationCode: string) => licensing.activate(activationCode))
-  ipcMain.handle('licensing:deactivate', () => licensing.deactivate())
-  ipcMain.handle('licensing:open-purchase', async () => {
-    await shell.openExternal(PRO_PURCHASE_URL)
-  })
   ipcMain.handle('automation:status', () => automation.status())
   ipcMain.handle('automation:start', () => automation.start())
   ipcMain.handle('automation:stop', () => automation.stop(false))

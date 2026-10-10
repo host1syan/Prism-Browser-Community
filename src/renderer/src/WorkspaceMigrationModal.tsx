@@ -76,7 +76,7 @@ export function WorkspaceMigrationModal({ mode, busy, profileCount, onSubmit, on
             </Radio.Group>
           </div>
         )}
-        <Typography.Text type="secondary">{t("Prism 不保存迁移密码，密码遗失后无法恢复迁移包。跨系统迁移后，部分网站可能需要重新登录。")}</Typography.Text>
+        <Typography.Text type="secondary">{t("Yk 指纹浏览器 不保存迁移密码，密码遗失后无法恢复迁移包。跨系统迁移后，部分网站可能需要重新登录。")}</Typography.Text>
       </Space>
     </Modal>
   )

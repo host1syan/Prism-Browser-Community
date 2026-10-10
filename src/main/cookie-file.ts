@@ -93,7 +93,7 @@ export function parseCookieFile(raw: string): PortableCookie[] {
     : value && typeof value === 'object' && Array.isArray((value as Partial<PrismCookieFile>).cookies)
       ? (value as Partial<PrismCookieFile>).cookies!
       : undefined
-  if (!source) throw new Error('Cookie 文件必须是数组或 Prism Cookie 导出文件')
+  if (!source) throw new Error('Cookie 文件必须是数组或 Yk 指纹浏览器 Cookie 导出文件')
   if (source.length > 10_000) throw new Error('单次最多导入 10000 条 Cookie')
   return source.map((cookie, index) => {
     if (!cookie || typeof cookie !== 'object') throw new Error(`第 ${index + 1} 条 Cookie 格式无效`)

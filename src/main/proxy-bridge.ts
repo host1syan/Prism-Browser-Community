@@ -11,6 +11,12 @@ const bridges = new Map<string, proxyChain.Server>()
 
 export function upstreamProxyUrl(proxy: ProxyConfig): string | undefined {
   if (proxy.protocol === 'direct') return undefined
+  if (proxy.protocol === 'v2ray') {
+    // The local Xray relay is dialled as a plain SOCKS5 upstream. The node
+    // itself is resolved by V2rayManager, which owns the relay lifetime.
+    if (!proxy.v2rayRelay) throw new Error('v2ray 节点尚未启动，请重新打开环境')
+    return `socks5://${proxy.v2rayRelay.host}:${proxy.v2rayRelay.port}`
+  }
   const credentials = proxy.username || proxy.password
     ? `${encodeURIComponent(proxy.username)}:${encodeURIComponent(proxy.password)}@`
     : ''

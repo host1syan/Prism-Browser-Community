@@ -40,23 +40,13 @@ Si le système bloque une version non signée, confirmez son ouverture dans **R�
 
 Chaque profil utilise un répertoire de données distinct. La duplication conserve les paramètres tout en créant une nouvelle identité et une nouvelle graine.
 
-## Fonctionnalités et éditions
+## Fonctionnalités
+
+Tout s’exécute en local : aucun compte, abonnement ni activation. L’API d’automatisation locale, les tâches planifiées et le contrôle de l’IA locale via MCP font partie de la version gratuite, et le noyau d’empreintes est fourni avec l’application.
 
 Community propose des profils locaux illimités, des données indépendantes, des proxies HTTP/HTTPS/SOCKS5 et une protection contre les fuites WebRTC. Il permet de configurer User-Agent, langue, fuseau horaire, écran, CPU, mémoire et GPU, avec des caractéristiques cohérentes pour Canvas, WebGL, Audio, DOMRect, polices, Speech et WebGPU.
 
 Il inclut duplication, groupes, étiquettes, favoris, opérations groupées, corbeille et migration locale des cookies, profils ou de l’espace de travail complet. Les icônes du Dock macOS et de la barre des tâches Windows peuvent afficher le numéro du profil.
-
-| Fonctionnalité | Community | Prism Pro |
-| --- | :---: | :---: |
-| Profils locaux illimités, empreintes, proxies et données indépendantes | ✓ | ✓ |
-| Groupes, duplication, opérations groupées et migration locale | ✓ | ✓ |
-| Moteur d’empreintes Community fourni avec l’application | ✓ | ✓ |
-| Moteurs plus récents distribués officiellement | — | ✓ |
-| API locale d’automatisation, tâches planifiées et contrôle IA par MCP | — | ✓ |
-
-L’API Pro utilise un jeton temporaire et n’est pas exposée à Internet. Les tâches peuvent être ponctuelles, quotidiennes ou hebdomadaires. MCP ne donne à l’IA accès qu’aux profils autorisés ; cet accès peut être arrêté ou révoqué à tout moment. Passer à Pro n’envoie pas vos profils, cookies, données d’extensions ou identifiants de proxy vers un serveur.
-
-La licence Pro est valable un an, pour un appareil à la fois par code d’activation. Après désactivation, la durée restante peut être utilisée sur un autre appareil. L’expiration ou la désactivation ne supprime pas les profils ; les fonctions Community restent disponibles.
 
 ## Vérification
 

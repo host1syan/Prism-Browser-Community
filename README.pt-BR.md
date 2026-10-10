@@ -40,23 +40,13 @@ Se o sistema bloquear uma versão sem assinatura, confirme a abertura em **Ajust
 
 Cada perfil usa um diretório de dados próprio. A duplicação mantém as configurações e gera uma identidade e uma semente novas.
 
-## Recursos e edições
+## Recursos
+
+Tudo roda na máquina local: não há conta, assinatura nem ativação. A API de automação local, as tarefas agendadas e o controle de IA local via MCP fazem parte da versão gratuita, e o núcleo de impressões digitais acompanha o aplicativo.
 
 Community oferece perfis locais ilimitados, dados independentes, proxies HTTP/HTTPS/SOCKS5 e proteção contra vazamentos WebRTC. É possível configurar User-Agent, idioma, fuso horário, tela, CPU, memória e GPU, mantendo consistência entre Canvas, WebGL, Audio, DOMRect, fontes, Speech e WebGPU.
 
 Também inclui duplicação, grupos, etiquetas, favoritos, operações em lote, lixeira e migração local de cookies, perfis ou de todo o espaço de trabalho. Os ícones no Dock do macOS e na barra de tarefas do Windows podem mostrar o número do perfil.
-
-| Recurso | Community | Prism Pro |
-| --- | :---: | :---: |
-| Perfis locais ilimitados, impressões digitais, proxies e dados independentes | ✓ | ✓ |
-| Grupos, duplicação, operações em lote e migração local | ✓ | ✓ |
-| Motor Community incluído no aplicativo | ✓ | ✓ |
-| Motores mais recentes distribuídos oficialmente | — | ✓ |
-| API local de automação, tarefas agendadas e controle por IA via MCP | — | ✓ |
-
-A API Pro usa um token temporário e não fica exposta à internet. As tarefas podem ser executadas uma vez, diariamente ou semanalmente. O MCP permite acesso da IA apenas aos perfis autorizados, com interrupção ou revogação a qualquer momento. Migrar para Pro não envia perfis, cookies, dados de extensões ou credenciais de proxy para um servidor.
-
-A licença Pro vale por um ano, com um dispositivo vinculado por código de ativação de cada vez. Após desativar, o prazo restante pode ser usado em outro dispositivo. Expiração ou desativação não apagam perfis; os recursos Community continuam disponíveis.
 
 ## Verificação
 

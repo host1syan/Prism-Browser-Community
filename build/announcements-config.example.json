@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "announcementsBaseUrl": "https://updates.example.com/",
+  "announcementsPublicKey": "-----BEGIN PUBLIC KEY-----\n替换为 Ed25519 公钥\n-----END PUBLIC KEY-----\n"
+}

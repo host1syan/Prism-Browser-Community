@@ -40,6 +40,7 @@ const api: BrowserApi = {
     diagnose: (id: string) => ipcRenderer.invoke('profiles:diagnose', id),
     crashHistory: (id: string) => ipcRenderer.invoke('profiles:crash-history', id),
     setFavorite: (id: string, favorite: boolean) => ipcRenderer.invoke('profiles:set-favorite', id, favorite),
+    setV2rayNode: (id: string, nodeId: string) => ipcRenderer.invoke('profiles:set-v2ray-node', id, nodeId),
     classifyMany: (ids: string[], patch: ProfileBatchClassification) => ipcRenderer.invoke('profiles:classify-many', ids, patch),
     removeMany: (ids: string[]) => ipcRenderer.invoke('profiles:remove-many', ids),
     onChanged: (listener: (profile: BrowserProfileView) => void) => {
@@ -81,21 +82,20 @@ const api: BrowserApi = {
   proxy: {
     test: (config, profileId) => ipcRenderer.invoke('proxy:test', config, profileId)
   },
+  v2ray: {
+    subscriptions: () => ipcRenderer.invoke('v2ray:subscriptions'),
+    addSubscription: (draft) => ipcRenderer.invoke('v2ray:add-subscription', draft),
+    refreshSubscription: (id: string) => ipcRenderer.invoke('v2ray:refresh-subscription', id),
+    removeSubscription: (id: string) => ipcRenderer.invoke('v2ray:remove-subscription', id),
+    nodes: (subscriptionId?: string) => ipcRenderer.invoke('v2ray:nodes', subscriptionId),
+    testNode: (nodeId: string) => ipcRenderer.invoke('v2ray:test-node', nodeId),
+    coreStatus: () => ipcRenderer.invoke('v2ray:core-status'),
+    installCore: () => ipcRenderer.invoke('v2ray:install-core'),
+    importCore: () => ipcRenderer.invoke('v2ray:import-core')
+  },
   diagnostics: {
     sessionHealth: () => ipcRenderer.invoke('diagnostics:session-health'),
     e2eQuit: () => ipcRenderer.invoke('diagnostics:e2e-quit')
-  },
-  licensing: {
-    status: () => ipcRenderer.invoke('licensing:status'),
-    sync: () => ipcRenderer.invoke('licensing:sync'),
-    activate: (activationCode: string) => ipcRenderer.invoke('licensing:activate', activationCode),
-    deactivate: () => ipcRenderer.invoke('licensing:deactivate'),
-    openPurchase: () => ipcRenderer.invoke('licensing:open-purchase'),
-    onChanged: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, status: Parameters<typeof listener>[0]) => listener(status)
-      ipcRenderer.on('licensing:changed', handler)
-      return () => ipcRenderer.removeListener('licensing:changed', handler)
-    }
   },
   automation: {
     status: () => ipcRenderer.invoke('automation:status'),

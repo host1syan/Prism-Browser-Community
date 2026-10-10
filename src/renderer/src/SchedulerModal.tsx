@@ -15,7 +15,6 @@ interface SchedulerModalProps {
   open: boolean
   tasks: ScheduledTask[]
   profiles: BrowserProfileView[]
-  proEnabled: boolean
   onChanged: (tasks: ScheduledTask[]) => void
   onClose: () => void
 }
@@ -51,7 +50,7 @@ function outcomeTag(task: ScheduledTask) {
   return <Tag color={value.color}>{value.text}</Tag>
 }
 
-export function SchedulerModal({ open, tasks, profiles, proEnabled, onChanged, onClose }: SchedulerModalProps) {
+export function SchedulerModal({ open, tasks, profiles, onChanged, onClose }: SchedulerModalProps) {
   const [editing, setEditing] = useState<ScheduledTask | null | undefined>(undefined)
   const [draft, setDraft] = useState<ScheduledTaskDraft>(() => defaultDraft())
   const [busyId, setBusyId] = useState('')
@@ -116,13 +115,13 @@ export function SchedulerModal({ open, tasks, profiles, proEnabled, onChanged, o
     <Modal open={open} width={920} title={<Space><ClockCircleOutlined />{t("本地计划任务")}</Space>} footer={null} onCancel={onClose} className="scheduler-modal">
       <Space direction="vertical" size={14} style={{ width: '100%' }}>
         <Alert
-          type={proEnabled ? 'info' : 'warning'} showIcon icon={<SafetyCertificateOutlined />}
-          title={proEnabled ? t("{0} 个任务已启用，仅在本机执行", enabledCount) : t("创建和执行计划任务需要 Prism Pro")}
-          description={t("计划任务仅在 Prism 运行时执行；错过的任务会按照你设置的规则处理。")}
+          type="info" showIcon icon={<SafetyCertificateOutlined />}
+          title={t("{0} 个任务已启用，仅在本机执行", enabledCount)}
+          description={t("计划任务仅在 Yk 指纹浏览器 运行时执行；错过的任务会按照你设置的规则处理。")}
         />
         <div className="scheduler-toolbar">
           <Typography.Text type="secondary">{t("共 {0} 个任务", tasks.length)}</Typography.Text>
-          <Button type="primary" icon={<PlusOutlined />} disabled={!proEnabled || !profiles.length} onClick={() => openEditor()}>{t("新建任务")}</Button>
+          <Button type="primary" icon={<PlusOutlined />} disabled={!profiles.length} onClick={() => openEditor()}>{t("新建任务")}</Button>
         </div>
         {error && <Alert type="error" showIcon title={mt(error)} closable onClose={() => setError('')} />}
         <div className="scheduler-list">
@@ -131,7 +130,7 @@ export function SchedulerModal({ open, tasks, profiles, proEnabled, onChanged, o
           ) : tasks.map((task) => (
             <div className={`scheduler-task ${task.enabled ? '' : 'disabled'}`} key={task.id}>
               <Switch
-                size="small" checked={task.enabled} disabled={busyId === task.id || !proEnabled && !task.enabled}
+                size="small" checked={task.enabled} disabled={busyId === task.id}
                 onChange={(enabled) => void operation(task.id, () => window.browserApi.scheduler.setEnabled(task.id, enabled))}
               />
               <div className="scheduler-task-main">
@@ -145,8 +144,8 @@ export function SchedulerModal({ open, tasks, profiles, proEnabled, onChanged, o
                 {task.lastMessage && <small className={task.lastOutcome === 'failure' ? 'task-error' : ''}>{task.lastAttempts ? t("上次：{0}（{1} 次尝试）", mt(task.lastMessage), task.lastAttempts) : t("上次：{0}", mt(task.lastMessage))}</small>}
               </div>
               <div className="scheduler-task-actions">
-                <Button size="small" icon={<PlayCircleOutlined />} loading={busyId === `run-${task.id}`} disabled={!proEnabled} onClick={() => void operation(`run-${task.id}`, () => window.browserApi.scheduler.runNow(task.id))}>{t("立即运行")}</Button>
-                <Button size="small" icon={<EditOutlined />} disabled={!proEnabled || busyId === task.id} onClick={() => openEditor(task)} />
+                <Button size="small" icon={<PlayCircleOutlined />} loading={busyId === `run-${task.id}`} onClick={() => void operation(`run-${task.id}`, () => window.browserApi.scheduler.runNow(task.id))}>{t("立即运行")}</Button>
+                <Button size="small" icon={<EditOutlined />} disabled={busyId === task.id} onClick={() => openEditor(task)} />
                 <Popconfirm title={t("删除这个计划任务？")} description={t("只删除任务，不会删除浏览器环境。")} okText={t("删除")} cancelText={t("取消")} okButtonProps={{ danger: true }} onConfirm={() => operation(task.id, () => window.browserApi.scheduler.remove(task.id))}>
                   <Button size="small" danger icon={<DeleteOutlined />} disabled={busyId === task.id} />
                 </Popconfirm>

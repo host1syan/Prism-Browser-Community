@@ -602,6 +602,34 @@ export class ProfileStore {
     return profile
   }
 
+  /**
+   * Repoints a v2ray profile at another node without touching anything else.
+   *
+   * Only the node id changes, so the fingerprint, window and every other proxy
+   * field survive. The stored exit check belongs to the old node, so it is
+   * dropped; the launch flow measures the new exit before the browser starts.
+   */
+  async setV2rayNode(id: string, nodeIdInput: string): Promise<BrowserProfile> {
+    const nodeId = typeof nodeIdInput === 'string' ? nodeIdInput.trim() : ''
+    // Same shape validateProxyConfig enforces, so a bad id can never be written.
+    if (!/^[a-f\d-]{36}$/i.test(nodeId)) throw new Error('v2ray 节点标识无效')
+    const current = this.get(id)
+    if (current.proxy.protocol !== 'v2ray') throw new Error('该环境未使用 v2ray 代理')
+    if (current.status !== 'closed' && current.status !== 'error') {
+      throw new Error('请先关闭浏览器环境再切换节点')
+    }
+    if (current.proxy.v2rayNodeId === nodeId) return current
+    const profile: BrowserProfile = {
+      ...current,
+      proxy: { ...current.proxy, v2rayNodeId: nodeId, v2rayRelay: undefined },
+      updatedAt: new Date().toISOString()
+    }
+    delete profile.proxyCheck
+    this.profiles.set(id, profile)
+    await this.persist()
+    return profile
+  }
+
   async setFavorite(id: string, favorite: boolean): Promise<BrowserProfile> {
     if (typeof favorite !== 'boolean') throw new Error('收藏状态无效')
     const current = this.get(id)

@@ -22,7 +22,7 @@ export function profileWindowName(profile: Pick<BrowserProfile, 'serialNumber' |
     .replace(/[\u0000-\u001f\u007f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 60) || 'Prism 环境'
+    .slice(0, 60) || 'Yk 指纹浏览器 环境'
   return `[${profile.serialNumber}] ${name}`
 }
 

@@ -6,10 +6,6 @@ import type { SchedulerAuditLog } from './scheduler-audit'
 import type { SchedulerStore } from './scheduler-store'
 import { safeErrorText } from './redaction'
 
-interface SchedulerLicenseAuthority {
-  has(entitlement: 'scheduler'): boolean
-}
-
 const POLL_INTERVAL_MS = 15_000
 const MAX_MISSED_AGE_MS = 24 * 60 * 60_000
 const MISSED_SKIP_GRACE_MS = 5 * 60_000
@@ -24,7 +20,6 @@ export class SchedulerManager {
     private readonly store: SchedulerStore,
     private readonly profiles: ProfileStore,
     private readonly launcher: BrowserLauncher,
-    private readonly licensing: SchedulerLicenseAuthority,
     private readonly audit: SchedulerAuditLog,
     private readonly onChanged: (tasks: ScheduledTask[]) => void,
     private readonly logger?: Logger,
@@ -37,7 +32,7 @@ export class SchedulerManager {
 
   async initialize(): Promise<void> {
     await this.store.initialize()
-    this.refreshEntitlement()
+    this.startPolling()
   }
 
   list(): ScheduledTask[] { return this.store.list() }
@@ -47,7 +42,6 @@ export class SchedulerManager {
   }
 
   async create(draft: ScheduledTaskDraft): Promise<ScheduledTask> {
-    this.requireEntitlement()
     this.profiles.get(draft.profileId)
     const task = await this.store.create(draft)
     this.audit.record({ action: 'task-create', outcome: 'success', taskId: task.id, profileId: task.profileId })
@@ -56,7 +50,6 @@ export class SchedulerManager {
   }
 
   async update(id: string, draft: ScheduledTaskDraft): Promise<ScheduledTask> {
-    this.requireEntitlement()
     this.assertNotExecuting(id)
     this.profiles.get(draft.profileId)
     const task = await this.store.update(id, draft)
@@ -66,7 +59,6 @@ export class SchedulerManager {
   }
 
   async setEnabled(id: string, enabled: boolean): Promise<ScheduledTask> {
-    if (enabled) this.requireEntitlement()
     this.assertNotExecuting(id)
     const task = this.store.get(id)
     this.profiles.get(task.profileId)
@@ -85,28 +77,20 @@ export class SchedulerManager {
   }
 
   runNow(id: string): Promise<ScheduledTask> {
-    this.requireEntitlement()
     if (this.executing.size >= this.maxConcurrent && !this.executing.has(id)) throw new Error(`已有 ${this.maxConcurrent} 个计划任务正在执行，请稍后重试`)
     return this.execute(this.store.get(id), undefined)
   }
 
-  refreshEntitlement(): void {
-    const entitled = this.licensing.has('scheduler')
-    if (entitled && !this.active) {
-      this.active = true
-      void this.tick()
-      this.pollTimer = setInterval(() => void this.tick(), this.pollIntervalMs)
-      this.pollTimer.unref()
-    } else if (!entitled && this.active) {
-      this.active = false
-      if (this.pollTimer) clearInterval(this.pollTimer)
-      this.pollTimer = undefined
-      this.cancelRetryWaiters()
-    }
+  private startPolling(): void {
+    if (this.active) return
+    this.active = true
+    void this.tick()
+    this.pollTimer = setInterval(() => void this.tick(), this.pollIntervalMs)
+    this.pollTimer.unref()
   }
 
   async tick(): Promise<void> {
-    if (!this.active || !this.licensing.has('scheduler')) return
+    if (!this.active) return
     const now = this.now().getTime()
     const due = this.store.list().filter((task) => task.enabled && task.nextRunAt && Date.parse(task.nextRunAt) <= now)
     for (const task of due) {
@@ -197,10 +181,6 @@ export class SchedulerManager {
       waiter.resolve(false)
     }
     this.retryWaiters.clear()
-  }
-
-  private requireEntitlement(): void {
-    if (!this.licensing.has('scheduler')) throw new Error('本地计划任务需要 Prism Pro 授权')
   }
 
   private assertNotExecuting(id: string): void {

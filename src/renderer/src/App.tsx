@@ -7,7 +7,6 @@ import {
   CheckCircleFilled,
   ClockCircleOutlined,
   CopyOutlined,
-  CrownOutlined,
   DatabaseOutlined,
   DeleteOutlined,
   DownloadOutlined,
@@ -50,7 +49,7 @@ import {
   type TableColumnsType
 } from 'antd'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import type { AnnouncementStatus, AppRecoveryStatus, AppUpdateStatus, AutomationStatus, BrowserCrashRecord, BrowserExtension, BrowserProfileView, EngineStatus, KernelRelease, LaunchDiagnosticReport, LicenseStatus, McpProfilePermission, McpStatus, ProfileDraft, ProfileStoreHealth, ScheduledTask, StorageOverview } from '../../shared/types'
+import type { AnnouncementStatus, AppRecoveryStatus, AppUpdateStatus, AutomationStatus, BrowserCrashRecord, BrowserExtension, BrowserProfileView, EngineStatus, KernelRelease, LaunchDiagnosticReport, McpProfilePermission, McpStatus, ProfileDraft, ProfileStoreHealth, ScheduledTask, StorageOverview } from '../../shared/types'
 import { ProfileEditor } from './ProfileEditor'
 import { KernelManagerModal } from './KernelManagerModal'
 import { ProfileDataModal } from './ProfileDataModal'
@@ -60,13 +59,13 @@ import { LaunchDiagnosticsModal } from './LaunchDiagnosticsModal'
 import { CrashHistoryModal } from './CrashHistoryModal'
 import { BatchResultModal, type BatchOperationResult } from './BatchResultModal'
 import { UpdateModal } from './UpdateModal'
-import { PlanModal } from './PlanModal'
 import { WorkspaceMigrationModal } from './WorkspaceMigrationModal'
 import { AutomationModal } from './AutomationModal'
 import { SchedulerModal } from './SchedulerModal'
 import { McpModal } from './McpModal'
+import { V2rayModal } from './V2rayModal'
+import { V2rayNodePickerModal } from './V2rayNodePickerModal'
 import { effectiveNetworkIdentity, geoConflictConfirmationMessage } from '../../shared/network-identity'
-import { kernelRequiresPro } from '../../shared/kernel-policy'
 import { orderBatchLaunchProfiles, waitForBatchLaunchGap } from './batch-launch-order'
 import { profileTableSorters } from './profile-table-sort'
 
@@ -139,9 +138,6 @@ export default function App() {
   const [extensionManagerOpen, setExtensionManagerOpen] = useState(false)
   const [profileStorageHealth, setProfileStorageHealth] = useState<ProfileStoreHealth | null>(null)
   const [appRecoveryStatus, setAppRecoveryStatus] = useState<AppRecoveryStatus | null>(null)
-  const [planModalOpen, setPlanModalOpen] = useState(false)
-  const [license, setLicense] = useState<LicenseStatus | null>(null)
-  const [activatingLicense, setActivatingLicense] = useState(false)
   const [diagnosticProfile, setDiagnosticProfile] = useState<BrowserProfileView>()
   const [diagnosticReport, setDiagnosticReport] = useState<LaunchDiagnosticReport>()
   const [crashProfile, setCrashProfile] = useState<BrowserProfileView>()
@@ -165,23 +161,9 @@ export default function App() {
   const [mcpOpen, setMcpOpen] = useState(false)
   const [mcpStatus, setMcpStatus] = useState<McpStatus | null>(null)
   const [mcpPermissions, setMcpPermissions] = useState<McpProfilePermission[]>([])
+  const [v2rayOpen, setV2rayOpen] = useState(false)
+  const [nodePickerProfile, setNodePickerProfile] = useState<BrowserProfileView | null>(null)
   const [messageApi, contextHolder] = message.useMessage()
-
-  async function applyLicenseStatus(status: LicenseStatus, knownEngine?: EngineStatus): Promise<void> {
-    setLicense(status)
-    if (status.plan === 'pro') return
-    const selected = knownEngine ?? await window.browserApi.engine.status()
-    if (!kernelRequiresPro(selected.version)) return
-    const communityEngine = await window.browserApi.engine.activateBundled()
-    setEngine(communityEngine)
-    const [installedKernels, bundled] = await Promise.all([
-      window.browserApi.engine.installed(),
-      window.browserApi.engine.bundled()
-    ])
-    setKernels(installedKernels)
-    setBundledEngine(bundled)
-    messageApi.info(t("Pro 授权已失效，已自动切换到免费的 Chromium 144 内核"))
-  }
 
   useEffect(() => {
     void Promise.all([
@@ -193,13 +175,12 @@ export default function App() {
       window.browserApi.engine.bundled(),
       window.browserApi.diagnostics.sessionHealth(),
       window.browserApi.updates.status(),
-      window.browserApi.licensing.status(),
       window.browserApi.automation.status(),
       window.browserApi.scheduler.list(),
       window.browserApi.mcp.status(),
       window.browserApi.mcp.permissions()
     ])
-      .then(([items, engineStatus, extensionItems, storageHealth, installedKernels, bundled, recoveryStatus, applicationUpdate, licenseStatus, localAutomation, tasks, localMcp, permissions]) => {
+      .then(([items, engineStatus, extensionItems, storageHealth, installedKernels, bundled, recoveryStatus, applicationUpdate, localAutomation, tasks, localMcp, permissions]) => {
         setProfiles(items)
         setEngine(engineStatus)
         setExtensions(extensionItems)
@@ -208,7 +189,6 @@ export default function App() {
         setBundledEngine(bundled)
         setAppRecoveryStatus(recoveryStatus)
         setUpdateStatus(applicationUpdate)
-        void applyLicenseStatus(licenseStatus, engineStatus).catch((error) => messageApi.error(humanError(error)))
         setAutomationStatus(localAutomation)
         setScheduledTasks(tasks)
         setMcpStatus(localMcp)
@@ -219,66 +199,22 @@ export default function App() {
 
     void refreshStorageOverview()
     void window.browserApi.announcements.check().then(setAnnouncementStatus).catch(() => undefined)
-    void window.browserApi.licensing.sync().then((status) => applyLicenseStatus(status)).catch(() => undefined)
 
     const removeProfileListener = window.browserApi.profiles.onChanged((changed) => {
       setProfiles((current) => current.map((profile) => profile.id === changed.id ? changed : profile))
     })
     const removeUpdateListener = window.browserApi.updates.onChanged(setUpdateStatus)
-    const removeLicenseListener = window.browserApi.licensing.onChanged((status) => {
-      void applyLicenseStatus(status).catch((error) => messageApi.error(humanError(error)))
-    })
     const removeAutomationListener = window.browserApi.automation.onChanged(setAutomationStatus)
     const removeSchedulerListener = window.browserApi.scheduler.onChanged(setScheduledTasks)
     const removeMcpListener = window.browserApi.mcp.onChanged(setMcpStatus)
     return () => {
       removeProfileListener()
       removeUpdateListener()
-      removeLicenseListener()
       removeAutomationListener()
       removeSchedulerListener()
       removeMcpListener()
     }
   }, [messageApi])
-
-  async function activateLicense(activationCode: string): Promise<void> {
-    setActivatingLicense(true)
-    try {
-      const status = await window.browserApi.licensing.activate(activationCode)
-      setLicense(status)
-      messageApi.success(t("Prism Pro 已在当前设备激活"))
-    } catch (error) {
-      messageApi.error(humanError(error))
-    } finally {
-      setActivatingLicense(false)
-    }
-  }
-
-  async function deactivateLicense(): Promise<void> {
-    setActivatingLicense(true)
-    try {
-      const status = await window.browserApi.licensing.deactivate()
-      await applyLicenseStatus(status)
-      messageApi.success(t("当前设备已解除 Prism Pro 绑定"))
-    } catch (error) {
-      messageApi.error(humanError(error))
-    } finally {
-      setActivatingLicense(false)
-    }
-  }
-
-  async function openProPurchase(): Promise<void> {
-    try {
-      await window.browserApi.licensing.openPurchase()
-    } catch (error) {
-      messageApi.error(humanError(error))
-    }
-  }
-
-  function openPlanModal(): void {
-    setPlanModalOpen(true)
-    void window.browserApi.licensing.sync().then(setLicense).catch(() => undefined)
-  }
 
   const visibleProfiles = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -323,7 +259,6 @@ export default function App() {
   }
 
   function canLaunchProfile(profile: BrowserProfileView): boolean {
-    if (kernelRequiresPro(profile.kernelVersion || engine?.version) && license?.plan !== 'pro') return false
     if (!profile.kernelVersion) return Boolean(engine?.executable)
     return selectableKernels.some((kernel) => kernel.version === profile.kernelVersion && kernel.executable)
   }
@@ -432,6 +367,38 @@ export default function App() {
   function openEditor(profile?: BrowserProfileView): void {
     setEditing(profile)
     setEditorOpen(true)
+  }
+
+  /**
+   * Repoints a profile at another v2ray node.
+   *
+   * The exit IP changes, so a running browser cannot keep its current network
+   * identity: it is closed first and reopened afterwards. The node is written
+   * through the dedicated store method so only `v2rayNodeId` moves and the
+   * stored exit check — which belongs to the old node — is dropped.
+   */
+  async function switchV2rayNode(profile: BrowserProfileView, nodeId: string): Promise<void> {
+    const wasRunning = profile.status !== 'closed' && profile.status !== 'error'
+    await withBusy(profile.id, async () => {
+      let saved: BrowserProfileView
+      try {
+        if (wasRunning) upsert(await window.browserApi.profiles.close(profile.id))
+        saved = await window.browserApi.profiles.setV2rayNode(profile.id, nodeId)
+        upsert(saved)
+      } catch (error) {
+        messageApi.error(humanError(error))
+        return
+      }
+      setNodePickerProfile(null)
+      if (wasRunning) {
+        const relaunched = await launchWithGeoConflictConfirmation(saved).catch((error) => {
+          messageApi.error(humanError(error))
+          return undefined
+        })
+        if (relaunched) upsert(relaunched)
+      }
+      messageApi.success(t('节点已切换'))
+    })
   }
 
   async function importProfile(): Promise<void> {
@@ -719,6 +686,12 @@ export default function App() {
     return {
       items: [
         { key: 'edit', icon: <EditOutlined />, label: t("编辑"), disabled: !editable },
+        {
+          key: 'switch-node',
+          icon: <GlobalOutlined />,
+          label: t("切换节点"),
+          disabled: profile.proxy.protocol !== 'v2ray'
+        },
         { key: 'data', icon: <DatabaseOutlined />, label: t("环境数据") },
         { key: 'diagnose', icon: <SafetyCertificateOutlined />, label: t("启动诊断") },
         { key: 'crashes', icon: <WarningFilled />, label: t("异常与恢复") },
@@ -730,6 +703,7 @@ export default function App() {
       ],
       onClick: ({ key }) => {
         if (key === 'edit') openEditor(profile)
+        if (key === 'switch-node') setNodePickerProfile(profile)
         if (key === 'data') setDataProfile(profile)
         if (key === 'diagnose') void runDiagnostics(profile)
         if (key === 'crashes') void openCrashHistory(profile)
@@ -834,7 +808,7 @@ export default function App() {
           <span>{profile.fingerprint.screenWidth}×{profile.fingerprint.screenHeight}</span>
           <span>{effectiveNetworkIdentity(profile.fingerprint, profile.proxyCheck).timezone}</span>
           <span>{profile.kernelVersion
-            ? <>{t("浏览器内核")}{profile.kernelVersion}{kernelRequiresPro(profile.kernelVersion) && <Tag color="gold">Pro</Tag>}</>
+            ? <>{t("浏览器内核")}{profile.kernelVersion}</>
             : t("内核自动")}</span>
           <span className={`webrtc-badge ${profile.fingerprint.webrtcPolicy}`}>
             {profile.fingerprint.webrtcPolicy === 'proxy_only' ? t("WebRTC 防泄漏") : profile.fingerprint.webrtcPolicy === 'public_only' ? t("WebRTC 公网") : t("WebRTC 默认")}
@@ -889,8 +863,8 @@ export default function App() {
       {contextHolder}
       <Sider width={224} className="sidebar">
         <div className="brand">
-          <div className="brand-mark">P</div>
-          <div><strong>Prism</strong><span>Browser</span></div>
+          <div className="brand-mark">Y</div>
+          <div><strong>Yk</strong><span>指纹浏览器</span></div>
         </div>
         <div className="sidebar-section-label">{t("工作空间")}</div>
         <div className="nav-item active"><AppstoreOutlined /><span>{t("浏览器环境")}</span><b>{profiles.length}</b></div>
@@ -900,6 +874,9 @@ export default function App() {
         <div className="sidebar-section-label secondary">{t("工具与自动化")}</div>
         <button className="nav-item sidebar-action" onClick={() => setExtensionManagerOpen(true)}>
           <AppstoreAddOutlined /><span>{t("浏览器扩展")}</span><b>{extensions.length || ''}</b>
+        </button>
+        <button className="nav-item sidebar-action" onClick={() => setV2rayOpen(true)}>
+          <GlobalOutlined /><span>{t("V2Ray 订阅")}</span>
         </button>
         <button className="nav-item sidebar-action" onClick={() => setUpdateModalOpen(true)}>
           <DownloadOutlined /><span>{t("应用更新")}</span><b>{announcementStatus?.state === 'available' ? '1' : ''}</b>
@@ -914,20 +891,12 @@ export default function App() {
           <RobotOutlined /><span>{t("本地 AI · MCP")}</span><b>{mcpStatus?.state === 'running' ? 'ON' : ''}</b>
         </button>
         <div className="sidebar-spacer" />
-        <button className="community-card" onClick={openPlanModal}>
-          <span className="community-icon"><CrownOutlined /></span>
-          <span>
-            <strong>{license?.plan === 'pro' ? 'Prism Pro' : 'Community'}</strong>
-            <small>{license?.plan === 'pro' ? t("已绑定当前设备") : `${t("免费")} · ${t("开源版本")} · ${t("本地优先")}`}</small>
-          </span>
-          <span className="community-action">{license?.plan === 'pro' ? t("查看授权") : t("了解 Pro")}</span>
-        </button>
         <button className="engine-card" onClick={() => setKernelManagerOpen(true)}>
           <span className={`engine-indicator ${engine?.fingerprintKernel ? 'ready' : ''}`} />
           <span><strong>{engine?.fingerprintKernel ? t("指纹内核已连接") : t("配置浏览器内核")}</strong><small>{mt(engine?.label ?? t("正在检查…"))}</small></span>
           <SettingOutlined />
         </button>
-        <div className="version">Prism Browser · v{updateStatus?.currentVersion ?? '0.2.0-beta.1'}</div>
+        <div className="version">Yk 指纹浏览器 · v{updateStatus?.currentVersion ?? '0.2.0-beta.1'}</div>
       </Sider>
 
       <Layout>
@@ -940,9 +909,6 @@ export default function App() {
             </div>
             <Space wrap className="header-actions">
               <LanguageSelector />
-              <Button className={`plan-pill ${license?.plan === 'pro' ? 'active' : ''}`} icon={<CrownOutlined />} onClick={openPlanModal}>
-                {license?.plan === 'pro' ? `Prism Pro · ${t("已激活")}` : `Community · ${t("免费")}`}
-              </Button>
               {runningCount > 0 && (
                 <Button icon={<PoweroffOutlined />} onClick={() => void window.browserApi.profiles.closeAll()}>{t("全部关闭")}</Button>
               )}
@@ -1145,15 +1111,6 @@ export default function App() {
         onClose={() => setUpdateModalOpen(false)}
         onAnnouncementChanged={setAnnouncementStatus}
       />
-      <PlanModal
-        open={planModalOpen}
-        license={license}
-        activating={activatingLicense}
-        onActivate={activateLicense}
-        onDeactivate={deactivateLicense}
-        onPurchase={openProPurchase}
-        onClose={() => setPlanModalOpen(false)}
-      />
       <WorkspaceMigrationModal
         mode={migrationMode}
         busy={migrationBusy}
@@ -1164,7 +1121,6 @@ export default function App() {
       <AutomationModal
         open={automationOpen}
         status={automationStatus}
-        proEnabled={Boolean(license?.entitlements.includes('automation-api'))}
         onChanged={setAutomationStatus}
         onClose={() => setAutomationOpen(false)}
       />
@@ -1172,7 +1128,6 @@ export default function App() {
         open={schedulerOpen}
         tasks={scheduledTasks}
         profiles={profiles}
-        proEnabled={Boolean(license?.entitlements.includes('scheduler'))}
         onChanged={setScheduledTasks}
         onClose={() => setSchedulerOpen(false)}
       />
@@ -1181,7 +1136,6 @@ export default function App() {
         status={mcpStatus}
         permissions={mcpPermissions}
         profiles={profiles}
-        proEnabled={Boolean(license?.entitlements.includes('mcp'))}
         onStatusChanged={setMcpStatus}
         onPermissionsChanged={setMcpPermissions}
         onClose={() => setMcpOpen(false)}
@@ -1196,14 +1150,21 @@ export default function App() {
         engine={engine}
         kernels={selectableKernels}
         groups={editableGroups}
-        proEnabled={license?.plan === 'pro'}
         onCancel={() => { setEditorOpen(false); setEditing(undefined) }}
         onSave={saveProfile}
+        onManageV2ray={() => setV2rayOpen(true)}
+      />
+      <V2rayModal open={v2rayOpen} onClose={() => setV2rayOpen(false)} />
+      <V2rayNodePickerModal
+        profile={nodePickerProfile}
+        onClose={() => setNodePickerProfile(null)}
+        onSelect={(nodeId) => nodePickerProfile
+          ? switchV2rayNode(nodePickerProfile, nodeId)
+          : Promise.resolve()}
       />
       <KernelManagerModal
         open={kernelManagerOpen}
         engine={engine}
-        proActive={license?.plan === 'pro'}
         onClose={() => setKernelManagerOpen(false)}
         onEngineChanged={(nextEngine) => {
           setEngine(nextEngine)

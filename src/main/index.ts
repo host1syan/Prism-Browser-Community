@@ -15,11 +15,9 @@ import { ProfileBackupManager } from './profile-backup'
 import { AppSessionTracker } from './app-session'
 import { UpdateManager } from './update-manager'
 import { migrateMacLegacyKernelSelection } from './browser-locator'
-import { LicenseManager } from './license-manager'
 import { WorkspaceMigrationManager } from './workspace-migration'
-import { ElectronDeviceKeyProtector } from './electron-device-key-protector'
 import { AutomationAuditLog } from './automation-audit'
-import { ProAgentManager } from './pro-agent-manager'
+import { LocalAutomationManager } from './automation-server'
 import { SchedulerStore } from './scheduler-store'
 import { SchedulerAuditLog } from './scheduler-audit'
 import { SchedulerManager } from './scheduler-manager'
@@ -27,12 +25,15 @@ import { McpPermissionStore } from './mcp-permission-store'
 import { McpAuditLog } from './mcp-audit'
 import { McpControlManager } from './mcp-control-manager'
 import { AnnouncementManager } from './announcement-manager'
+import { V2rayStore } from './v2ray-store'
+import { V2rayCore } from './v2ray-core'
+import { V2rayManager } from './v2ray-manager'
 
 let mainWindow: BrowserWindow | null = null
 let launcher: BrowserLauncher | null = null
 let logger: AppLogger | null = null
 let appSession: AppSessionTracker | null = null
-let automation: ProAgentManager | null = null
+let automation: LocalAutomationManager | null = null
 let scheduler: SchedulerManager | null = null
 let mcp: McpControlManager | null = null
 
@@ -49,7 +50,7 @@ function createWindow(): BrowserWindow {
     minWidth: 1040,
     minHeight: 680,
     show: false,
-    title: 'Prism Browser',
+    title: 'Yk 指纹浏览器',
     backgroundColor: '#f3f5f9',
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.cjs'),
@@ -97,7 +98,7 @@ app.whenReady().then(async () => {
   await Promise.all([automationAudit.initialize(), schedulerAudit.initialize(), mcpAudit.initialize()])
   const appSessionSnapshot = await appSession.begin(app.getVersion())
   if (appSessionSnapshot.previousUnclean) {
-    logger.error('检测到上次 Prism Browser 未正常退出', appSessionSnapshot.previousUnclean)
+    logger.error('检测到上次 Yk 指纹浏览器未正常退出', appSessionSnapshot.previousUnclean)
   }
   await Promise.all([profiles.initialize(), settings.initialize(), extensions.initialize()])
   const kernelMigration = await migrateMacLegacyKernelSelection(settings, vaultPath)
@@ -112,11 +113,19 @@ app.whenReady().then(async () => {
   const profileStorageHealth = profiles.storageHealth()
   if (profileStorageHealth.recoveredFromBackup) logger.error('环境元数据已从备份恢复', profileStorageHealth)
   if (!profileStorageHealth.backupHealthy) logger.error('环境元数据备份不可用', profileStorageHealth.backupError)
-  logger.info('Prism Browser 已启动', { version: app.getVersion(), platform: process.platform, arch: process.arch })
+  logger.info('Yk 指纹浏览器已启动', { version: app.getVersion(), platform: process.platform, arch: process.arch })
 
+  const v2ray = new V2rayManager({
+    store: new V2rayStore(vaultPath, new ElectronSecretCodec()),
+    core: new V2rayCore({ vaultPath, resourcesPath: process.resourcesPath, logger }),
+    vaultPath,
+    logger
+  })
+  await v2ray.initialize()
   launcher = new BrowserLauncher(profiles, settings, (profile) => {
     mainWindow?.webContents.send('profiles:changed', publicProfile(profile))
   }, extensions, logger)
+  launcher.setV2rayManager(v2ray)
   await launcher.initialize()
   const kernels = new KernelManager(vaultPath, settings, () => undefined, logger, (version) => profiles.kernelUsers(version))
   const cookies = new CookieManager(profiles, settings, logger)
@@ -126,48 +135,32 @@ app.whenReady().then(async () => {
     mainWindow?.webContents.send('updates:changed', status)
   }, logger)
   const announcements = new AnnouncementManager(process.resourcesPath, app.getVersion(), logger)
-  const licensing = new LicenseManager(
-    vaultPath,
-    process.resourcesPath,
-    app.getVersion(),
-    new ElectronDeviceKeyProtector(),
-    (status) => {
-      mainWindow?.webContents.send('licensing:changed', status)
-      if (status.plan !== 'pro') void automation?.stop(true).catch(() => undefined)
-      if (status.plan !== 'pro') void mcp?.emergencyStop().catch(() => undefined)
-      scheduler?.refreshEntitlement()
-    },
-    logger
-  )
-  await Promise.all([updater.initialize(), licensing.initialize()])
-  launcher.setProKernelAccessCheck(() => licensing.status().plan === 'pro')
-  kernels.setProKernelAccessCheck(() => licensing.status().plan === 'pro')
+  await updater.initialize()
   mcp = new McpControlManager(
-    new McpPermissionStore(vaultPath), profiles, launcher, licensing, mcpAudit,
+    new McpPermissionStore(vaultPath), profiles, launcher, mcpAudit,
     (status) => mainWindow?.webContents.send('mcp:changed', status)
   )
   await mcp.initialize()
-  automation = new ProAgentManager(
+  automation = new LocalAutomationManager({
     profiles,
     launcher,
-    licensing,
-    automationAudit,
-    process.resourcesPath,
-    (status) => mainWindow?.webContents.send('automation:changed', status),
+    audit: automationAudit,
+    appVersion: app.getVersion(),
+    resourcesPath: process.resourcesPath,
+    onChanged: (status) => mainWindow?.webContents.send('automation:changed', status),
     logger
-  )
+  })
   automation.attachMcpBroker(mcp)
   scheduler = new SchedulerManager(
     new SchedulerStore(vaultPath),
     profiles,
     launcher,
-    licensing,
     schedulerAudit,
     (tasks) => mainWindow?.webContents.send('scheduler:changed', tasks),
     logger
   )
   await scheduler.initialize()
-  registerIpc({ profiles, settings, launcher, kernels, extensions, cookies, logger, backups, workspaceMigration, appSession, updater, licensing, automation, scheduler, mcp, announcements })
+  registerIpc({ profiles, settings, launcher, kernels, extensions, cookies, logger, backups, workspaceMigration, appSession, updater, automation, scheduler, mcp, announcements, v2ray })
   mainWindow = createWindow()
   if (app.isPackaged && process.env.PRISM_E2E !== '1') {
     setTimeout(() => void updater.check().catch(() => undefined), 10_000)
@@ -177,10 +170,10 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow()
   })
 }).catch(async (error) => {
-  logger?.error('Prism Browser 启动失败', error)
+  logger?.error('Yk 指纹浏览器启动失败', error)
   await logger?.flush()
   dialog.showErrorBox(
-    'Prism Browser 无法启动',
+    'Yk 指纹浏览器无法启动',
     '应用启动失败，但现有环境数据没有被修改。请重新启动；如仍然失败，请查看日志文件。'
   )
   app.quit()
@@ -197,10 +190,12 @@ app.on('before-quit', (event) => {
   event.preventDefault()
   const current = launcher
   launcher = null
-  void Promise.allSettled([scheduler?.shutdown() ?? Promise.resolve(), mcp?.shutdown() ?? Promise.resolve()]).then(() => Promise.allSettled([
-    current.closeAll(), automation?.stop(false) ?? Promise.resolve()
-  ])).finally(async () => {
-    logger?.info('Prism Browser 已退出')
+  void Promise.allSettled([
+    scheduler?.shutdown() ?? Promise.resolve(),
+    mcp?.shutdown() ?? Promise.resolve(),
+    automation?.shutdown() ?? Promise.resolve()
+  ]).then(() => Promise.allSettled([current.closeAll()])).then(() => current.stopV2rayRelays()).finally(async () => {
+    logger?.info('Yk 指纹浏览器已退出')
     await appSession?.complete().catch((error) => logger?.error('清理应用会话标记失败', error))
     await logger?.flush()
     app.quit()

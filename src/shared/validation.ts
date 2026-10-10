@@ -167,7 +167,7 @@ export function validateProxyConfig(input: ProxyConfig): ProxyConfig {
   if (typeof input.host !== 'string' || typeof input.username !== 'string' || typeof input.password !== 'string') {
     throw new Error('代理配置格式无效')
   }
-  const allowed = new Set(['direct', 'http', 'https', 'socks5'])
+  const allowed = new Set(['direct', 'http', 'https', 'socks5', 'v2ray'])
   if (!allowed.has(input.protocol)) throw new Error('不支持的代理协议')
   let host = input.host.trim()
   if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1)
@@ -181,6 +181,14 @@ export function validateProxyConfig(input: ProxyConfig): ProxyConfig {
   if (input.passwordStored === true) proxy.passwordStored = true
   if (proxy.protocol === 'direct') {
     return { protocol: 'direct', host: '', username: '', password: '' }
+  }
+  if (proxy.protocol === 'v2ray') {
+    // The node itself carries the endpoint and credentials, so nothing about the
+    // transport may be entered by hand here.
+    const nodeId = typeof input.v2rayNodeId === 'string' ? input.v2rayNodeId.trim() : ''
+    if (!nodeId) throw new Error('请选择 v2ray 节点')
+    if (!/^[a-f\d-]{36}$/i.test(nodeId)) throw new Error('v2ray 节点标识无效')
+    return { protocol: 'v2ray', host: '', username: '', password: '', v2rayNodeId: nodeId }
   }
   if (!proxy.host) throw new Error('代理地址不能为空')
   if (proxy.host.length > 255) throw new Error('代理地址不能超过 255 个字符')

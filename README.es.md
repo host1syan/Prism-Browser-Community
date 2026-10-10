@@ -40,23 +40,13 @@ Si el sistema bloquea una versión sin firmar, confirma su apertura en **Ajustes
 
 Cada perfil utiliza su propio directorio de datos. Al duplicarlo, se conservan los ajustes y se genera una identidad y una semilla nuevas.
 
-## Funciones y ediciones
+## Funciones
+
+Todo se ejecuta en la máquina local: no hay cuenta, suscripción ni activación. La API de automatización local, las tareas programadas y el control de IA local mediante MCP forman parte de la versión gratuita, y el núcleo de huellas se incluye con la aplicación.
 
 Community ofrece perfiles locales ilimitados, datos de navegación independientes, proxies HTTP/HTTPS/SOCKS5 y protección contra fugas WebRTC. Permite configurar User-Agent, idioma, zona horaria, pantalla, CPU, memoria y GPU, manteniendo coherencia entre Canvas, WebGL, Audio, DOMRect, fuentes, Speech y WebGPU.
 
 Incluye duplicación, grupos, etiquetas, favoritos, operaciones por lotes, papelera y migración local de cookies, perfiles o del espacio de trabajo completo. Los iconos del Dock de macOS y de la barra de tareas de Windows pueden mostrar el número del perfil.
-
-| Función | Community | Prism Pro |
-| --- | :---: | :---: |
-| Perfiles locales ilimitados, huellas, proxies y datos independientes | ✓ | ✓ |
-| Grupos, duplicación, operaciones por lotes y migración local | ✓ | ✓ |
-| Motor de huellas Community incluido con la aplicación | ✓ | ✓ |
-| Motores más recientes distribuidos oficialmente | — | ✓ |
-| API local de automatización, tareas programadas y control por IA mediante MCP | — | ✓ |
-
-La API Pro utiliza un token temporal y no se expone a Internet. Las tareas pueden ejecutarse una vez, diariamente o semanalmente. MCP permite a la IA acceder únicamente a los perfiles autorizados; el acceso puede detenerse o revocarse en cualquier momento. La actualización a Pro no sube perfiles, cookies, datos de extensiones ni credenciales de proxy.
-
-La licencia Pro dura un año y permite vincular un código a un dispositivo a la vez. Tras desactivarlo, el periodo restante puede utilizarse en otro dispositivo. La caducidad o desactivación no elimina perfiles; las funciones Community siguen disponibles.
 
 ## Verificación
 

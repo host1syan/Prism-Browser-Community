@@ -30,6 +30,7 @@
     "accept:local-summary": "node tools/local-acceptance/aggregate.mjs",
     "analyze:soak": "node tools/runtime-soak/analyze.cjs",
     "kernel:verify-lock": "node tools/kernel-maintenance/run.mjs verify-lock",
+    "kernel:prepare-bundled": "node tools/prepare-bundled-kernel.mjs",
     "kernel:probe-upstream": "node tools/kernel-maintenance/run.mjs probe-upstream --output release/kernel-upstream.json",
     "kernel:export-kits": "node tools/kernel-maintenance/run.mjs export-kits --kits-output release/kernel-build-kits",
     "release:update-manifest": "node tools/release/create-update-manifest.mjs",
@@ -68,8 +69,8 @@
   },
   "build": {
     "appId": "com.prismbrowser.desktop",
-    "productName": "Prism Browser",
-    "copyright": "Copyright © 2026 Prism Browser. All rights reserved.",
+    "productName": "Yk 指纹浏览器",
+    "copyright": "Copyright © 2026 Yk 指纹浏览器. All rights reserved.",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "asar": true,
     "directories": {
@@ -78,6 +79,29 @@
     "files": [
       "out/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/v2ray",
+        "to": "v2ray",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "build/kernels/current",
+        "to": "kernels/current",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "build/mcp",
+        "to": "mcp",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -110,7 +134,7 @@
       "runAfterFinish": false,
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
-      "shortcutName": "Prism Browser"
+      "shortcutName": "Yk 指纹浏览器"
     },
     "portable": {
       "artifactName": "${productName} ${version}.${ext}"

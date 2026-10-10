@@ -71,7 +71,7 @@ export function UpdateModal({
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <div>
           <Typography.Title level={4} style={{ margin: 0 }}>
-            Prism Browser {appStatus?.currentVersion ?? ''}
+            Yk 指纹浏览器 {appStatus?.currentVersion ?? ''}
           </Typography.Title>
           <Space wrap>
             <Tag>{t("当前版本 {0}", appStatus?.currentVersion ?? t("未知"))}</Tag>

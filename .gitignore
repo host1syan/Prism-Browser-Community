@@ -7,3 +7,5 @@ dist/
 vault/
 *.tsbuildinfo
 /private/
+# Staged by `npm run kernel:prepare-bundled`; ~450 MB and regenerable.
+/build/kernels/current/
