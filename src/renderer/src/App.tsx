@@ -49,7 +49,7 @@ import {
   type TableColumnsType
 } from 'antd'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import type { AnnouncementStatus, AppRecoveryStatus, AppUpdateStatus, AutomationStatus, BrowserCrashRecord, BrowserExtension, BrowserProfileView, EngineStatus, KernelRelease, LaunchDiagnosticReport, McpProfilePermission, McpStatus, ProfileDraft, ProfileStoreHealth, ScheduledTask, StorageOverview } from '../../shared/types'
+import type { AnnouncementStatus, AppRecoveryStatus, AppUpdateStatus, AutomationStatus, BrowserCrashRecord, BrowserExtension, BrowserProfileView, EngineStatus, KernelRelease, LaunchDiagnosticReport, McpProfilePermission, McpStatus, PortableStatus, ProfileDraft, ProfileStoreHealth, ScheduledTask, StorageOverview } from '../../shared/types'
 import { ProfileEditor } from './ProfileEditor'
 import { KernelManagerModal } from './KernelManagerModal'
 import { ProfileDataModal } from './ProfileDataModal'
@@ -163,6 +163,7 @@ export default function App() {
   const [mcpPermissions, setMcpPermissions] = useState<McpProfilePermission[]>([])
   const [v2rayOpen, setV2rayOpen] = useState(false)
   const [nodePickerProfile, setNodePickerProfile] = useState<BrowserProfileView | null>(null)
+  const [portableStatus, setPortableStatus] = useState<PortableStatus | null>(null)
   const [messageApi, contextHolder] = message.useMessage()
 
   useEffect(() => {
@@ -178,9 +179,10 @@ export default function App() {
       window.browserApi.automation.status(),
       window.browserApi.scheduler.list(),
       window.browserApi.mcp.status(),
-      window.browserApi.mcp.permissions()
+      window.browserApi.mcp.permissions(),
+      window.browserApi.portable.status()
     ])
-      .then(([items, engineStatus, extensionItems, storageHealth, installedKernels, bundled, recoveryStatus, applicationUpdate, localAutomation, tasks, localMcp, permissions]) => {
+      .then(([items, engineStatus, extensionItems, storageHealth, installedKernels, bundled, recoveryStatus, applicationUpdate, localAutomation, tasks, localMcp, permissions, portableRun]) => {
         setProfiles(items)
         setEngine(engineStatus)
         setExtensions(extensionItems)
@@ -193,6 +195,7 @@ export default function App() {
         setScheduledTasks(tasks)
         setMcpStatus(localMcp)
         setMcpPermissions(permissions)
+        setPortableStatus(portableRun)
       })
       .catch((error) => messageApi.error(humanError(error)))
       .finally(() => setLoading(false))
@@ -897,6 +900,11 @@ export default function App() {
           <SettingOutlined />
         </button>
         <div className="version">Yk 指纹浏览器 · v{updateStatus?.currentVersion ?? '0.2.0-beta.1'}</div>
+        {portableStatus?.portable && (
+          <Tooltip title={t("便携模式：数据保存在 {0}", portableStatus.root ?? '')}>
+            <div className="portable-badge"><FolderOutlined />{t("便携模式")}</div>
+          </Tooltip>
+        )}
       </Sider>
 
       <Layout>

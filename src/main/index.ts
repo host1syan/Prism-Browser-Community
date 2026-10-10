@@ -28,6 +28,7 @@ import { AnnouncementManager } from './announcement-manager'
 import { V2rayStore } from './v2ray-store'
 import { V2rayCore } from './v2ray-core'
 import { V2rayManager } from './v2ray-manager'
+import { configurePortableLayout, loadPortableSecretCodec } from './portable'
 
 let mainWindow: BrowserWindow | null = null
 let launcher: BrowserLauncher | null = null
@@ -42,6 +43,10 @@ if (process.platform === 'win32') app.setAppUserModelId('com.prismbrowser.deskto
 if (process.env.PRISM_E2E === '1' && process.env.PRISM_E2E_USER_DATA && isAbsolute(process.env.PRISM_E2E_USER_DATA)) {
   app.setPath('userData', process.env.PRISM_E2E_USER_DATA)
 }
+
+// Must run before whenReady(): Electron resolves userData during startup, so a
+// later setPath would strand Chromium's own state in the old location.
+const portable = configurePortableLayout()
 
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -88,13 +93,24 @@ app.whenReady().then(async () => {
   const vaultPath = join(app.getPath('userData'), 'vault')
   logger = new AppLogger(vaultPath)
   appSession = new AppSessionTracker(vaultPath)
-  const profiles = new ProfileStore(vaultPath, new ElectronSecretCodec())
+  // A portable disk cannot use the OS keyring: its key is bound to the machine
+  // that wrote the secret, so the next computer could not read it back. The key
+  // travels on the disk instead.
+  const secretCodec = portable.root
+    ? loadPortableSecretCodec(portable.root)
+    : new ElectronSecretCodec()
+  const profiles = new ProfileStore(vaultPath, secretCodec)
   const settings = new SettingsStore(vaultPath)
   const extensions = new ExtensionStore(vaultPath, logger)
   const automationAudit = new AutomationAuditLog(vaultPath)
   const schedulerAudit = new SchedulerAuditLog(vaultPath)
   const mcpAudit = new McpAuditLog(vaultPath)
   await logger.initialize()
+  if (portable.portable) {
+    logger.info('便携模式：数据保存在程序目录', { root: portable.root })
+  } else {
+    logger.info('便携模式未启用', { reason: portable.reason })
+  }
   await Promise.all([automationAudit.initialize(), schedulerAudit.initialize(), mcpAudit.initialize()])
   const appSessionSnapshot = await appSession.begin(app.getVersion())
   if (appSessionSnapshot.previousUnclean) {
@@ -116,7 +132,7 @@ app.whenReady().then(async () => {
   logger.info('Yk 指纹浏览器已启动', { version: app.getVersion(), platform: process.platform, arch: process.arch })
 
   const v2ray = new V2rayManager({
-    store: new V2rayStore(vaultPath, new ElectronSecretCodec()),
+    store: new V2rayStore(vaultPath, secretCodec),
     core: new V2rayCore({ vaultPath, resourcesPath: process.resourcesPath, logger }),
     vaultPath,
     logger
@@ -160,7 +176,11 @@ app.whenReady().then(async () => {
     logger
   )
   await scheduler.initialize()
-  registerIpc({ profiles, settings, launcher, kernels, extensions, cookies, logger, backups, workspaceMigration, appSession, updater, automation, scheduler, mcp, announcements, v2ray })
+  registerIpc({
+    profiles, settings, launcher, kernels, extensions, cookies, logger, backups, workspaceMigration,
+    appSession, updater, automation, scheduler, mcp, announcements, v2ray,
+    portableStatus: () => ({ portable: portable.portable, root: portable.root, reason: portable.reason })
+  })
   mainWindow = createWindow()
   if (app.isPackaged && process.env.PRISM_E2E !== '1') {
     setTimeout(() => void updater.check().catch(() => undefined), 10_000)

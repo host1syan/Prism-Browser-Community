@@ -284,6 +284,15 @@ export interface AppUpdateStatus {
   downloadedPath?: string
 }
 
+/** Where this run keeps its data, so the UI can say so and warn when relevant. */
+export interface PortableStatus {
+  portable: boolean
+  /** Directory holding the vault when portable. */
+  root?: string
+  /** Why portable mode was declined; only meaningful when portable is false. */
+  reason?: string
+}
+
 export interface ProxyTestResult {
   ok: boolean
   ip?: string
@@ -549,6 +558,9 @@ export interface BrowserApi {
     download: () => Promise<AppUpdateStatus>
     openInstaller: () => Promise<void>
     onChanged: (listener: (status: AppUpdateStatus) => void) => () => void
+  }
+  portable: {
+    status: () => Promise<PortableStatus>
   }
   announcements: {
     status: () => Promise<AnnouncementStatus>

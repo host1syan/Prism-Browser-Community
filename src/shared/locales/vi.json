@@ -1214,5 +1214,7 @@
   "页面输入参数无效": "Tham số đầu vào trang không hợp lệ",
   "高风险：WebRTC 使用所有接口": "Rủi ro cao: WebRTC dùng tất cả giao diện mạng",
   "默认全部关闭，逐个授权": "Mặc định tắt tất cả, cấp quyền từng hồ sơ",
-  "默认关闭，按需启动": "Mặc định tắt, chỉ bật khi cần"
+  "默认关闭，按需启动": "Mặc định tắt, chỉ bật khi cần",
+  "便携模式": "Chế độ di động",
+  "便携模式：数据保存在 {0}": "Chế độ di động: dữ liệu được lưu trong {0}"
 }

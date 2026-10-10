@@ -1214,5 +1214,7 @@
   "页面输入参数无效": "Sayfa giriş parametreleri geçersiz",
   "高风险：WebRTC 使用所有接口": "Yüksek risk: WebRTC tüm arabirimleri kullanır",
   "默认全部关闭，逐个授权": "Varsayılan olarak hepsi kapalı; profillere tek tek izin verin",
-  "默认关闭，按需启动": "Varsayılan olarak kapalı; gerektiğinde başlatın"
+  "默认关闭，按需启动": "Varsayılan olarak kapalı; gerektiğinde başlatın",
+  "便携模式": "Taşınabilir mod",
+  "便携模式：数据保存在 {0}": "Taşınabilir mod: veriler {0} içinde saklanır"
 }

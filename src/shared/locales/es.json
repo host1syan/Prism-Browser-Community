@@ -1214,5 +1214,7 @@
   "页面输入参数无效": "Los parámetros de entrada de página no son válidos",
   "高风险：WebRTC 使用所有接口": "Alto riesgo: WebRTC utiliza todas las interfaces",
   "默认全部关闭，逐个授权": "Todo desactivado de forma predeterminada; autorice cada perfil por separado",
-  "默认关闭，按需启动": "Desactivada de forma predeterminada; iníciela cuando la necesite"
+  "默认关闭，按需启动": "Desactivada de forma predeterminada; iníciela cuando la necesite",
+  "便携模式": "Modo portátil",
+  "便携模式：数据保存在 {0}": "Modo portátil: los datos se guardan en {0}"
 }

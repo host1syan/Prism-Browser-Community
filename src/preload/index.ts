@@ -63,6 +63,9 @@ const api: BrowserApi = {
     remove: (version: string) => ipcRenderer.invoke('engine:remove', version),
     verify: (version: string) => ipcRenderer.invoke('engine:verify', version)
   },
+  portable: {
+    status: () => ipcRenderer.invoke('portable:status')
+  },
   updates: {
     status: () => ipcRenderer.invoke('updates:status'),
     check: () => ipcRenderer.invoke('updates:check'),

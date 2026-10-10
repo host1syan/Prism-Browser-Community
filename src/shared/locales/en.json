@@ -1214,5 +1214,7 @@
   "页面输入参数无效": "Page input parameters are invalid",
   "高风险：WebRTC 使用所有接口": "High risk: WebRTC uses all interfaces",
   "默认全部关闭，逐个授权": "Access is off by default. Allow each profile individually.",
-  "默认关闭，按需启动": "Off by default. Start it only when needed."
+  "默认关闭，按需启动": "Off by default. Start it only when needed.",
+  "便携模式": "Portable mode",
+  "便携模式：数据保存在 {0}": "Portable mode: data is stored in {0}"
 }

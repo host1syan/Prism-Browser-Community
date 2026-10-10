@@ -2,7 +2,7 @@ import { t } from '../shared/i18n'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { lstat, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { ProfileDraft } from '../shared/types'
+import type { PortableStatus, ProfileDraft } from '../shared/types'
 import type { KernelManager } from './kernel-manager'
 import { listBundledBrowsers, locateBrowser, locateBundledBrowser, normalizeBrowserSelection } from './browser-locator'
 import { mergeKernelCatalog } from './kernel-catalog'
@@ -46,9 +46,10 @@ interface IpcDependencies {
   mcp: McpControlManager
   announcements: AnnouncementManager
   v2ray: V2rayManager
+  portableStatus: () => PortableStatus
 }
 
-export function registerIpc({ profiles, settings, launcher, kernels, extensions, cookies, logger, backups, workspaceMigration, appSession, updater, automation, scheduler, mcp, announcements, v2ray }: IpcDependencies): void {
+export function registerIpc({ profiles, settings, launcher, kernels, extensions, cookies, logger, backups, workspaceMigration, appSession, updater, automation, scheduler, mcp, announcements, v2ray, portableStatus }: IpcDependencies): void {
   ipcMain.handle('profiles:list', () => profiles.list().map(publicProfile))
   ipcMain.handle('profiles:storage-health', () => profiles.storageHealth())
   ipcMain.handle('profiles:create', async (_event, draft: ProfileDraft) => publicProfile(await profiles.create(draft)))
@@ -351,6 +352,7 @@ export function registerIpc({ profiles, settings, launcher, kernels, extensions,
     }
     return kernels.verify(version)
   })
+  ipcMain.handle('portable:status', () => portableStatus())
   ipcMain.handle('updates:status', () => updater.status())
   ipcMain.handle('updates:check', () => updater.check())
   ipcMain.handle('updates:download', () => updater.download())
